@@ -1,0 +1,1234 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:google_fonts/google_fonts.dart'; // Assuming GoogleFonts is available
+import 'package:go_router/go_router.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:inkbattle_frontend/constants/app_images.dart';
+import 'package:inkbattle_frontend/services/ad_service.dart';
+import 'package:inkbattle_frontend/utils/routes/routes.dart';
+import 'package:inkbattle_frontend/widgets/blue_background_scaffold.dart';
+import 'package:inkbattle_frontend/repositories/room_repository.dart';
+import 'package:inkbattle_frontend/repositories/theme_repository.dart';
+import 'package:inkbattle_frontend/repositories/user_repository.dart';
+import 'package:inkbattle_frontend/models/room_model.dart';
+import 'package:inkbattle_frontend/utils/lang.dart';
+
+class MultiplayerScreen extends StatefulWidget {
+  MultiplayerScreen({super.key, this.bannerAd});
+  final BannerAd? bannerAd;
+
+  @override
+  State<MultiplayerScreen> createState() => _MultiplayerScreenState();
+}
+
+class _MultiplayerScreenState extends State<MultiplayerScreen> {
+  final RoomRepository _roomRepository = RoomRepository();
+  final UserRepository _userRepository = UserRepository();
+  final ThemeRepository _themeRepository = ThemeRepository();
+
+  String? selectedLanguage;
+  String? selectedScript;
+  String? selectedCountry;
+  String? selectedPoints;
+  String? selectedCategory;
+
+  bool voiceEnabled = false;
+  String? selectedGameMode = "team_vs_team";
+  bool _isLoading = false;
+  BannerAd? _bannerAd;
+  bool _isBannerAdLoaded = false;
+
+  List<RoomModel> _rooms = [];
+
+  List<String> languages = [];
+  final List<String> scripts = ["default", "english"];
+  final List<String> countries = [
+    "🇮🇳 India",
+    "🇺🇸 USA",
+    "🇬🇧 UK",
+    "🇯🇵 Japan",
+    "🇪🇸 Spain",
+    "🇵🇹 Portugal",
+    "🇫🇷 France",
+    "🇩🇪 Germany",
+    "🇷🇺 Russia"
+  ];
+  final List<String> points = ["50", "100", "150", "200"];
+  List<String> categories = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLanguagesAndCategories();
+    // Initialize default values to satisfy `allFilled` on load
+    selectedScript = scripts.first;
+    selectedPoints = points.first;
+    // selectedCountry = countries.first; // No default country selection
+
+    _loadRooms();
+    _loadBannerAd();
+  }
+
+  @override
+  void dispose() {
+    _bannerAd?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadBannerAd() async {
+    try {
+      await AdService.initializeMobileAds();
+      await AdService.loadBannerAd(
+        onAdLoaded: (ad) {
+          if (mounted) {
+            setState(() {
+              _bannerAd = ad as BannerAd;
+              _isBannerAdLoaded = true;
+            });
+            print('✅ Banner ad loaded successfully');
+          }
+        },
+        onAdFailedToLoad: (ad, error) {
+          print('❌ Banner ad failed to load: $error');
+          if (mounted) {
+            setState(() {
+              _isBannerAdLoaded = false;
+            });
+          }
+        },
+      );
+    } catch (e) {
+      print('Error loading banner ad: $e');
+    }
+  }
+
+  Future<void> _loadLanguagesAndCategories() async {
+    // Load languages
+    final languagesResult = await _userRepository.getLanguages();
+    languagesResult.fold(
+      (failure) {
+        if (mounted) {
+          setState(() {
+            languages = ["English", "Hindi", "Marathi", "Telugu"];
+            selectedLanguage = languages.first;
+          });
+        }
+      },
+      (languagesList) {
+        if (languagesList.isEmpty) {
+          if (mounted) {
+            setState(() {
+              languages = ["English", "Hindi", "Marathi", "Telugu"];
+              selectedLanguage = languages.first;
+            });
+          }
+          return;
+        } else {
+          if (mounted) {
+            setState(() {
+              languages = languagesList
+                  .map((lang) => lang['languageName'] as String? ?? '')
+                  .where((name) => name.isNotEmpty)
+                  .toList();
+              // Set default language after loading
+              selectedLanguage = languages.isNotEmpty ? languages.first : null;
+            });
+          }
+        }
+      },
+    );
+
+    // Load categories
+    final categoriesResult = await _themeRepository.getCategories();
+    categoriesResult.fold(
+      (failure) {
+        if (mounted) {
+          setState(() {
+            categories = ["Fruits", "Animals", "Food", "Movies"];
+            selectedCategory = categories.first;
+          });
+        }
+      },
+      (categoriesList) {
+        if (categoriesList.isEmpty) {
+          if (mounted) {
+            setState(() {
+              categories = ["Fruits", "Animals", "Food", "Movies"];
+              selectedCategory = categories.first;
+            });
+          }
+          return;
+        }
+
+        if (mounted) {
+          setState(() {
+            categories = categoriesList
+                .map((cat) => cat['title'] as String? ?? '')
+                .where((title) => title.isNotEmpty)
+                .toList();
+            // Set default category after loading
+            selectedCategory = categories.isNotEmpty ? categories.first : null;
+          });
+        }
+      },
+    );
+  }
+
+  Future<void> _loadRooms() async {
+    // Only load if essential filters are set
+    if (!allFilled) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final result = await _roomRepository.listRooms(
+          language: selectedLanguage,
+          gameMode: selectedGameMode,
+          country: selectedCountry == "All" ? null : selectedCountry,
+          category: selectedCategory,
+          script: selectedScript,
+          targetPoints: int.tryParse(selectedPoints.toString()) ?? 250,
+          voiceEnabled: voiceEnabled);
+
+      result.fold(
+        (failure) {
+          print('Failed to load rooms: ${failure.message}');
+        },
+        (roomListResponse) {
+          if (mounted) {
+            setState(() {
+              _rooms = roomListResponse.rooms ?? [];
+            });
+          }
+        },
+      );
+    } catch (e) {
+      print('Error loading rooms: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _joinRoom(RoomModel room) async {
+    room.gameMode == 'team' || room.gameMode == 'team_vs_team'
+        ? context.push(
+            "/teamvsteam/${room.id}/${room.category}/${room.entryPoints}",
+            extra: {
+                "roomModel": room,
+                "bannerAd": widget.bannerAd,
+              })
+        : context.push(
+            "/onevsone/${room.id}/${room.category}/${room.entryPoints}",
+            extra: {
+                "roomModel": room,
+                "bannerAd": widget.bannerAd,
+              });
+  }
+
+  Future<String?> _showTeamSelectionDialog() async {
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        title: Text(
+          'Select Your Team',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18.sp,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildTeamOption('orange', Colors.orange),
+            SizedBox(height: 16.h),
+            _buildTeamOption('blue', Colors.blue),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTeamOption(String team, Color color) {
+    return InkWell(
+      onTap: () => Navigator.pop(context, team),
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 16.h, horizontal: 20.w),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: color, width: 2),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 24.w,
+              height: 24.h,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+              ),
+            ),
+            SizedBox(width: 12.w),
+            Text(
+              'Team ${team[0].toUpperCase()}${team.substring(1)}',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showInsufficientCoinsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        title: Text(
+          "Insufficient Coins",
+          style: TextStyle(
+            fontSize: 18.sp,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        content: Text(
+          "You don't have enough coins to join. Watch ads or buy coins to continue playing.",
+          style: TextStyle(
+            fontSize: 14.sp,
+            color: Colors.grey,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              "Cancel",
+              style: TextStyle(
+                fontSize: 14.sp,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Watch ads feature coming soon!')),
+              );
+            },
+            child: Text(
+              "Watch Ads",
+              style: TextStyle(
+                fontSize: 14.sp,
+                color: Colors.orange,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Buy coins feature coming soon!')),
+              );
+            },
+            child: Text(
+              "Buy Coins",
+              style: TextStyle(
+                fontSize: 14.sp,
+                color: Colors.green,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlueBackgroundScaffold(
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Back button
+            Padding(
+              padding: EdgeInsets.only(
+                  left: 8.w, top: 8.h, bottom: 16.h, right: 8.w),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Icon(
+                    Icons.arrow_back_ios,
+                    color: Colors.white,
+                    size: 24.sp,
+                  ),
+                ),
+              ),
+            ),
+
+            // Filter Pills - Row 1
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildFilterPill(
+                      image: AppImages.global,
+                      icon: Icons.language,
+                      value: selectedLanguage,
+                      items: languages,
+                      onChanged: (val) {
+                        setState(() => selectedLanguage = val);
+                        print(selectedLanguage);
+                        _loadRooms();
+                      },
+                      hintText: "Language",
+                      iconColor: Colors.lightBlueAccent,
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: _buildFilterPill(
+                      image: AppImages.language,
+                      icon: Icons.image,
+                      value: selectedScript,
+                      items: scripts,
+                      onChanged: (val) {
+                        setState(() => selectedScript = val);
+                        _loadRooms();
+                      },
+                      hintText: "Script",
+                      iconColor: Colors.deepPurpleAccent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            SizedBox(height: 10.h),
+
+            // Filter Pills - Row 2
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildFilterPill(
+                      image: AppImages.country,
+                      icon: Icons.public,
+                      value: selectedCountry,
+                      items: countries,
+                      onChanged: (val) {
+                        setState(() => selectedCountry = val);
+                        _loadRooms();
+                      },
+                      hintText: "Country",
+                      iconColor: Colors.lightGreenAccent,
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: _buildFilterPill(
+                      image: AppImages.coinStar,
+                      icon: Icons.star,
+                      value: selectedPoints,
+                      items: points,
+                      onChanged: (val) {
+                        setState(() => selectedPoints = val);
+                        _loadRooms();
+                      },
+                      hintText: "Points",
+                      iconColor: Colors.amber,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            SizedBox(height: 10.h),
+
+            // Filter Pills - Row 3
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildFilterPill(
+                      image: AppImages.category,
+                      icon: Icons.category,
+                      value: selectedCategory,
+                      items: categories,
+                      onChanged: (val) {
+                        setState(() => selectedCategory = val);
+                        _loadRooms();
+                      },
+                      hintText: "Category",
+                      iconColor: Colors.orange,
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: _buildFilterPill(
+                      image: AppImages.game,
+                      icon: Icons.people,
+                      value: AppLocalizations.team,
+                      onChanged: null, // Make it unchangeable
+                      hintText: AppLocalizations.mode,
+                      items: [
+                        AppLocalizations.team,
+                      ],
+                      iconColor: Colors.blueAccent,
+                      isStatic: true, // Make it static/unchangeable
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            SizedBox(height: 16.h),
+
+            // Rooms Container
+            Expanded(
+              child: Container(
+                margin: EdgeInsets.symmetric(horizontal: 12.w),
+                padding: EdgeInsets.symmetric(vertical: 16.h, horizontal: 12.w),
+                decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                        begin: AlignmentGeometry.topCenter,
+                        end: AlignmentGeometry.bottomCenter,
+                        colors: [
+                          Color.fromARGB(255, 34, 52, 96),
+                          Color.fromARGB(
+                            255,
+                            17,
+                            29,
+                            63,
+                          ),
+                          Color.fromARGB(
+                            255,
+                            17,
+                            29,
+                            63,
+                          ),
+                          Color.fromARGB(
+                            255,
+                            17,
+                            29,
+                            63,
+                          ),
+                          Color.fromARGB(
+                            255,
+                            22,
+                            43,
+                            81,
+                          ),
+                        ]),
+                    borderRadius: BorderRadius.circular(20.r),
+                    border: Border.all(
+                        color: Color.fromARGB(255, 52, 91, 168), width: 1)),
+                child: allFilled
+                    ? _isLoading
+                        ? const Center(
+                            child:
+                                CircularProgressIndicator(color: Colors.white),
+                          )
+                        : _rooms.isEmpty
+                            ? Center(
+                                child: Text(
+                                  'No rooms available',
+                                  style: TextStyle(
+                                    color: Colors.white60,
+                                    fontSize: 16.sp,
+                                  ),
+                                ),
+                              )
+                            : ListView.separated(
+                                itemCount: _rooms.length,
+                                separatorBuilder: (_, __) =>
+                                    SizedBox(height: 16.h),
+                                itemBuilder: (context, index) {
+                                  final room = _rooms[index];
+                                  return _buildRoomCard(room);
+                                },
+                              )
+                    : Center(
+                        child: Text(
+                          'Select all filters to view rooms',
+                          style: TextStyle(
+                            color: Colors.white60,
+                            fontSize: 16.sp,
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+            SizedBox(height: 10.h),
+            // Banner Ad
+            if (_isBannerAdLoaded && _bannerAd != null)
+              Container(
+                width: double.infinity,
+                height: 60.h,
+                color: Colors.black.withOpacity(0.3),
+                child: AdWidget(ad: _bannerAd!),
+              )
+            else
+              Container(
+                width: double.infinity,
+                height: 60.h,
+                color: Colors.grey.withOpacity(0.2),
+                child: Center(
+                  child: Text(
+                    'Loading ads...',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12.sp,
+                    ),
+                  ),
+                ),
+              ),
+            SizedBox(height: 10.h),
+          ],
+        ),
+      ),
+    );
+  }
+
+// Helper widget for handling both Dropdowns and Static Toggles
+  // Widget _buildFilterPillMic({
+  //   required IconData icon,
+  //   String? value,
+  //   List<String>? items,
+  //   ValueChanged<String?>? onChanged, // Used for dropdowns
+  //   VoidCallback? onTap, // Used for static/toggle buttons
+  //   required String hintText,
+  //   Color iconColor = Colors.white,
+  //   bool isStatic =
+  //       false, // If true, ignore dropdown logic and just execute onTap
+  //   bool isToggle = false,
+  //   String? image,
+  //   bool isEnabled = true, // New parameter for enable/disable state
+  //   ValueChanged<bool>? onEnabledChanged, // Callback for checkbox state changes
+  // }) {
+  //   final GlobalKey tapKey = GlobalKey();
+  //   final String displayValue = value ?? hintText;
+  //   final bool isInteractive = onChanged != null || onTap != null;
+  //   final bool isDropdown =
+  //       !isStatic && !isToggle; // True if it should open a menu
+
+  //   return Container(
+  //     height: 35.h,
+  //     decoration: BoxDecoration(
+  //       borderRadius: BorderRadius.circular(25.r),
+  //       border: Border.all(
+  //         color: isEnabled
+  //             ? Colors.white
+  //             : Colors.grey, // Grey border when disabled
+  //         width: 1.w,
+  //       ),
+  //       color: const Color(0xFF0E0E0E),
+  //     ),
+  //     child: Material(
+  //       color: Colors.transparent,
+  //       child: InkWell(
+  //         key: tapKey,
+  //         borderRadius: BorderRadius.circular(25.r),
+  //         onTap: isEnabled
+  //             ? (isDropdown
+  //                 ? () async {
+  //                     // If it's a dropdown, show the menu
+  //                     final box = tapKey.currentContext!.findRenderObject()
+  //                         as RenderBox;
+  //                     final Offset pos = box.localToGlobal(Offset.zero);
+  //                     final Size size = box.size;
+
+  //                     final selected = await showMenu<String>(
+  //                       context: context,
+  //                       position: RelativeRect.fromLTRB(
+  //                         pos.dx,
+  //                         pos.dy + size.height,
+  //                         pos.dx + size.width,
+  //                         pos.dy + size.height * 2,
+  //                       ),
+  //                       color: const Color(0xFF1E2A3A),
+  //                       shape: RoundedRectangleBorder(
+  //                         borderRadius: BorderRadius.circular(12.r),
+  //                       ),
+  //                       items: items!.map((item) {
+  //                         return PopupMenuItem<String>(
+  //                           value: item,
+  //                           child: Text(
+  //                             item,
+  //                             style: GoogleFonts.lato(
+  //                               color: Colors.white,
+  //                               fontSize: 14.sp,
+  //                             ),
+  //                           ),
+  //                         );
+  //                       }).toList(),
+  //                     );
+  //                     if (selected != null) onChanged!(selected);
+  //                   }
+  //                 : onTap) // If it's a static/toggle button, execute the direct onTap
+  //             : null, // Disable tap when not enabled
+
+  //         child: Padding(
+  //           padding: EdgeInsets.symmetric(horizontal: 12.w),
+  //           child: Row(
+  //             mainAxisAlignment: MainAxisAlignment.center,
+  //             children: [
+  //               image != null
+  //                   ? Image.asset(
+  //                       image,
+  //                       height: 20.h,
+  //                       width: 20.w,
+  //                       color: isEnabled
+  //                           ? null
+  //                           : Colors.grey, // Grey out image when disabled
+  //                     )
+  //                   : const SizedBox.shrink(),
+  //               SizedBox(width: 6.w),
+  //               Flexible(
+  //                 child: Text(
+  //                   // Truncate long display values
+  //                   displayValue.length > 8
+  //                       ? "${displayValue.substring(0, 8)}..."
+  //                       : displayValue,
+  //                   overflow: TextOverflow.ellipsis,
+  //                   style: GoogleFonts.lato(
+  //                     color: isEnabled
+  //                         ? Colors.white
+  //                         : Colors.grey, // Grey text when disabled
+  //                     fontSize: 14.sp,
+  //                     fontWeight: FontWeight.w500,
+  //                   ),
+  //                 ),
+  //               ),
+  //               const Spacer(),
+  //               // Only show the dropdown icon if it's an actual dropdown menu and enabled
+  //               if (isDropdown && isEnabled)
+  //                 Image.asset(
+  //                   "asset/image/arrow_down.png",
+  //                   height: 14.sp,
+  //                   width: 14.sp,
+  //                 ),
+
+  //               // Checkbox at the end
+  //               // if (onEnabledChanged != null) ...[
+  //               SizedBox(width: 8.w),
+  //               Container(
+  //                 width: 20.w,
+  //                 height: 20.h,
+  //                 decoration: BoxDecoration(
+  //                   color: displayValue == 'On'
+  //                       ? Colors.green
+  //                       : Colors.transparent,
+  //                   borderRadius: BorderRadius.circular(4.r),
+  //                   border: Border.all(
+  //                     color: displayValue == 'On' ? Colors.green : Colors.grey,
+  //                     width: 2.w,
+  //                   ),
+  //                 ),
+  //                 child: Theme(
+  //                   data: ThemeData(
+  //                     unselectedWidgetColor: Colors.transparent,
+  //                   ),
+  //                   child: Checkbox(
+  //                     value: isEnabled,
+  //                     onChanged: (bool? newValue) {
+  //                       if (newValue != null) {
+  //                         isEnabled = !isEnabled;
+  //                         onEnabledChanged!(true);
+  //                       }
+  //                     },
+  //                     activeColor: Colors.transparent,
+  //                     checkColor: Colors.white,
+  //                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  //                     visualDensity: VisualDensity.compact,
+  //                     side: const BorderSide(color: Colors.transparent),
+  //                   ),
+  //                 ),
+  //               ),
+  //               // ],
+  //             ],
+  //           ),
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
+
+  // Helper widget for handling both Dropdowns and Static Toggles
+  Widget _buildFilterPill({
+    required IconData icon,
+    String? value,
+    List<String>? items,
+    ValueChanged<String?>? onChanged, // Used for dropdowns
+    VoidCallback? onTap, // Used for static/toggle buttons
+    required String hintText,
+    Color iconColor = Colors.white,
+    bool isStatic =
+        false, // If true, ignore dropdown logic and just execute onTap
+    bool isToggle = false,
+    String? image, // If true, ignore dropdown logic and just execute onTap
+  }) {
+    final GlobalKey tapKey = GlobalKey();
+    final String displayValue = value ?? hintText;
+    final bool isInteractive = onChanged != null || onTap != null;
+    final bool isDropdown =
+        !isStatic && !isToggle; // True if it should open a menu
+
+    return Container(
+      height: 45.h,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(25.r),
+        // Use a subtle gradient/border for styling
+        border: Border.all(color: Colors.white, width: 1.w),
+        color: const Color(0xFF0E0E0E),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: tapKey,
+          borderRadius: BorderRadius.circular(25.r),
+          onTap: selectedLanguage == "English" && hintText == "Script"
+              ? null
+              : isDropdown
+                  ? () async {
+                      // If it's a dropdown, show the menu
+                      final box = tapKey.currentContext!.findRenderObject()
+                          as RenderBox;
+                      final Offset pos = box.localToGlobal(Offset.zero);
+                      final Size size = box.size;
+
+                      final selected = await showMenu<String>(
+                        context: context,
+                        position: RelativeRect.fromLTRB(
+                            pos.dx,
+                            pos.dy + size.height,
+                            pos.dx + size.width,
+                            pos.dy + size.height * 2),
+                        color: const Color(0xFF1E2A3A),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                        items: items!.map((item) {
+                          return PopupMenuItem<String>(
+                            value: item,
+                            child: Text(
+                              item,
+                              style: GoogleFonts.lato(
+                                color: Colors.white,
+                                fontSize: 14.sp,
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      );
+                      if (selected != null) onChanged!(selected);
+                    }
+                  : onTap, // If it's a static/toggle button, execute the direct onTap
+
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                if (image != null) ...[
+                  Image.asset(
+                    image,
+                    height: 18.h,
+                    width: 18.w,
+                  ),
+                  SizedBox(width: 8.w),
+                ],
+                Expanded(
+                  child: Text(
+                    displayValue,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    softWrap: false,
+                    textAlign: TextAlign.left,
+                    style: GoogleFonts.lato(
+                      color: Colors.white,
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+                if (isDropdown) ...[
+                  SizedBox(width: 6.w),
+                  Image.asset(
+                    "asset/image/arrow_down.png",
+                    height: 14.sp,
+                    width: 14.sp,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGradientDropdown({
+    required IconData icon,
+    required String? value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+    required String hintText,
+    Color iconColor = Colors.white,
+  }) {
+    return _buildFilterPill(
+      icon: icon,
+      value: value,
+      items: items,
+      onChanged: onChanged,
+      hintText: hintText,
+      iconColor: iconColor,
+    );
+  }
+
+  // Mapping the old filter pill calls to the new generic pill
+  Widget _buildLanguagePill() => _buildGradientDropdown(
+        icon: Icons.language,
+        value: selectedLanguage,
+        items: languages,
+        onChanged: (val) {
+          setState(() => selectedLanguage = val);
+          _loadRooms();
+        },
+        hintText: "Language",
+        iconColor: Colors.lightBlueAccent,
+      );
+
+  Widget _buildScriptPill() => _buildGradientDropdown(
+        icon: Icons.image,
+        value: selectedScript,
+        items: scripts,
+        onChanged: (val) {
+          setState(() => selectedScript = val);
+          _loadRooms();
+        },
+        hintText: "Script",
+        iconColor: Colors.deepPurpleAccent,
+      );
+
+  Widget _buildPointsPill() => _buildGradientDropdown(
+        icon: Icons.star,
+        value: selectedPoints,
+        items: points,
+        onChanged: (val) {
+          setState(() => selectedPoints = val);
+          _loadRooms();
+        },
+        hintText: "Points",
+        iconColor: Colors.amber,
+      );
+
+  Widget _buildCountryPill() => _buildGradientDropdown(
+        icon: Icons.public,
+        value: selectedCountry,
+        items: countries,
+        onChanged: (val) {
+          setState(() => selectedCountry = val);
+          _loadRooms();
+        },
+        hintText: "Country",
+        iconColor: Colors.lightGreenAccent,
+      );
+
+  Widget _buildCategoryPill() => _buildGradientDropdown(
+        icon: Icons.category,
+        value: selectedCategory,
+        items: categories,
+        onChanged: (val) {
+          setState(() => selectedCategory = val);
+          _loadRooms();
+        },
+        hintText: "Category",
+        iconColor: Colors.orange,
+      );
+
+  // --- Existing logic (kept for completeness) ---
+
+  Widget _buildRoomCard(RoomModel room) {
+    const Color gradientStartColor =
+        Color.fromRGBO(110, 136, 206, 1); // rgba(110, 136, 206, 1)
+    const Color gradientEndColor =
+        Color.fromRGBO(44, 61, 106, 1); // rgba(44, 61, 106, 1)
+
+    // The thickness of the gradient border
+    const double borderWidth = 1.2;
+    return GestureDetector(
+      onTap: room.isFull == true ? null : () => _joinRoom(room),
+      child: Container(
+        padding: EdgeInsets.all(14.w),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16.r),
+          border: BoxBorder.fromLTRB(
+            bottom: BorderSide(
+              color: const Color.fromRGBO(31, 48, 96, 1),
+              width: borderWidth,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            // Icon Circle
+            Container(
+              // 1. Outer Container: Applies the Gradient
+              height: 50.h,
+              width: 50.h,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16.r + borderWidth),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [gradientStartColor, gradientEndColor],
+                ),
+              ),
+              padding: EdgeInsets.all(borderWidth), // Creates the border gap
+
+              // 2. Inner Container: Holds the original content
+              child: Container(
+                decoration: BoxDecoration(
+                  // Use the original solid background color
+                  color: const Color.fromARGB(255, 26, 42, 81),
+                  borderRadius: BorderRadius.circular(16.r),
+                ),
+                child: Center(
+                  child: Image.asset(
+                    _getCategoryIcon(room.category ?? 'Animals'),
+                    width: 53.w,
+                    height: 57.h,
+                    errorBuilder: (_, __, ___) => Icon(
+                      Icons.category,
+                      color: Colors.white,
+                      size: 32.sp,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            SizedBox(width: 12.w),
+
+            // Room Details
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title Row
+                  SizedBox(
+                    height: 24.h,
+                    child: Row(
+                      children: [
+                        Text(
+                          room.name ?? 'Room',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        VerticalDivider(
+                          width: 24.h,
+                          color: Color.fromRGBO(76, 99, 162, 1),
+                        ),
+                        (room.gameMode != null &&
+                                room.gameMode == 'team_vs_team')
+                            ? Text(
+                                '👥vs👥',
+                                style: TextStyle(
+                                  fontSize: 13.sp,
+                                  color: Color.fromRGBO(132, 156, 206, 1),
+                                ),
+                              )
+                            : Text(
+                                '👤vs👤',
+                                style: TextStyle(
+                                  fontSize: 13.sp,
+                                  color: Color.fromRGBO(132, 156, 206, 1),
+                                ),
+                              ),
+                        SizedBox(
+                          width: 15.w,
+                        ),
+                        Text(
+                          _getCountryFlag(room.country ?? 'India'),
+                          style: TextStyle(fontSize: 16.sp),
+                        ),
+                        Spacer(),
+                        if (room.voiceEnabled == true) ...[
+                          SizedBox(height: 8.h),
+                          Icon(
+                            Icons.mic,
+                            color: Color.fromRGBO(132, 156, 206, 1),
+                            size: 20.sp,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  // Info Row
+                  SizedBox(
+                    height: 24.h,
+                    child: Row(
+                      children: [
+                        Icon(Icons.people,
+                            color: Color.fromRGBO(132, 156, 206, 1),
+                            size: 14.sp),
+                        SizedBox(width: 4.w),
+                        Text(
+                          '${room.participantCount}/${room.maxPlayers}',
+                          style: TextStyle(
+                            color: Color.fromRGBO(132, 156, 206, 1),
+                            fontSize: 13.sp,
+                          ),
+                        ),
+                        SizedBox(width: 12.w),
+                        Icon(Icons.star,
+                            color: Color.fromRGBO(132, 156, 206, 1),
+                            size: 14.sp),
+                        SizedBox(width: 4.w),
+                        Text(
+                          '${room.pointsTarget}',
+                          style: TextStyle(
+                            color: Color.fromRGBO(132, 156, 206, 1),
+                            fontSize: 13.sp,
+                          ),
+                        ),
+                        SizedBox(width: 30.w),
+                        _buildBadge(
+                            room.language?.substring(0, 2).toUpperCase() ??
+                                'EN'),
+                        VerticalDivider(
+                            color: Color.fromRGBO(132, 156, 206, 1),
+                            thickness: 1),
+                        _buildBadge(
+                            room.script?.substring(0, 2).toUpperCase() ?? 'TE'),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Right Column
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBadge(String text) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: Color.fromRGBO(148, 175, 231, 1),
+          fontSize: 11.sp,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  String _getCountryFlag(String country) {
+    Map<String, String> flags = {
+      'India': '🇮🇳',
+      'USA': '🇺🇸',
+      'UK': '🇬🇧',
+      'Russia': '🇷🇺',
+      'Ukraine': '🇺🇦',
+      'Canada': '🇨🇦',
+    };
+    return flags[country] ?? '🏳️';
+  }
+
+  bool get allFilled =>
+      selectedLanguage != null &&
+      selectedScript != null &&
+      // selectedCountry != null && // Country is optional
+      selectedPoints != null &&
+      selectedCategory != null;
+
+  String _getCategoryIcon(String category) {
+    switch (category) {
+      case "Fruits":
+        return AppImages.fruit;
+      case "Animals":
+        return AppImages.animal;
+      case "Food":
+        return AppImages.food;
+      case "Movies":
+        return AppImages.movies;
+      default:
+        return AppImages.animal;
+    }
+  }
+
+  Future<String?> _showDropdownMenu(List<String> items) async {
+    final RenderBox? renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null) return null;
+
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return null;
+
+    final RelativeRect position = RelativeRect.fromRect(
+      Rect.fromPoints(
+        renderBox.localToGlobal(Offset.zero, ancestor: overlay),
+        renderBox.localToGlobal(renderBox.size.bottomRight(Offset.zero),
+            ancestor: overlay),
+      ),
+      Offset.zero & overlay.size,
+    );
+
+    return showMenu<String>(
+      context: context,
+      position: position,
+      color: const Color(0xFF1E3A5F),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      items: items.map((item) {
+        return PopupMenuItem<String>(
+          value: item,
+          child: Text(
+            item,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14.sp,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
