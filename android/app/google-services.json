@@ -22,6 +22,14 @@
           }
         },
         {
+          "client_id": "810403540241-4791bjkqjulc76s5ffdsta3kjmlh08gd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.inkbattle.app",
+            "certificate_hash": "04012e629901f1cdc583bceef329167ef31da427"
+          }
+        },
+        {
           "client_id": "810403540241-9c1dv0cbg1injb3i84o5ehr42fcen2nf.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -45,6 +53,13 @@
             {
               "client_id": "810403540241-ip9gtcb25f8m6f3du23riuqj5h5dbr9l.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "810403540241-jn3ngisp6peftdoofqko3b3u9qfsk2g7.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.inkbattle.app"
+              }
             }
           ]
         }
