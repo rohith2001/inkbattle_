@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -9,6 +10,7 @@ import 'package:inkbattle_frontend/utils/routes/routes.dart';
 import 'package:inkbattle_frontend/widgets/backgroun_scafold.dart';
 import 'package:inkbattle_frontend/widgets/text_widget.dart';
 import 'package:inkbattle_frontend/logic/auth/google_auth_service.dart';
+import 'package:inkbattle_frontend/logic/auth/apple_auth_service.dart';
 import 'package:inkbattle_frontend/logic/auth/facebook_auth_service.dart';
 import 'package:inkbattle_frontend/utils/preferences/local_preferences.dart';
 import 'package:inkbattle_frontend/utils/lang.dart';
@@ -24,9 +26,11 @@ class SignInScreen extends StatefulWidget {
 
 class _SignInScreenState extends State<SignInScreen> {
   final GoogleAuthService _googleAuthService = GoogleAuthService();
+  final AppleAuthService _appleAuthService = AppleAuthService();
   final FacebookAuthService _facebookAuthService = FacebookAuthService();
   final UserRepository _userRepository = UserRepository();
   bool _isGoogleLoading = false;
+  bool _isAppleLoading = false;
   bool _isFacebookLoading = false;
 
   Future<void> _signInWithGoogle() async {
@@ -83,6 +87,62 @@ class _SignInScreenState extends State<SignInScreen> {
     } finally {
       if (mounted) {
         setState(() => _isGoogleLoading = false);
+      }
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    if (_isAppleLoading || _isFacebookLoading) {
+      return; // Prevent multiple simultaneous sign-ins
+    }
+
+    setState(() => _isAppleLoading = true);
+
+    try {
+      final authResponse = await _appleAuthService.signInWithApple();
+
+      if (authResponse != null &&
+          authResponse.token != null &&
+          authResponse.token!.isNotEmpty) {
+        await LocalStorageUtils.saveUserDetails(authResponse.token!);
+        print('Apple sign-in successful, token saved');
+
+        await _applyUserLanguagePreference();
+
+        if (mounted) {
+          if (authResponse.isNew == true) {
+            VideoRewardDialog.show(
+              context,
+              coinsAwarded: 1000,
+              onComplete: () {
+                if (mounted) {
+                  context.go(Routes.homeScreen);
+                }
+              },
+            );
+          } else {
+            context.go(Routes.homeScreen);
+          }
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(AppLocalizations.googleSignInFailed)),
+          );
+        }
+      }
+    } catch (e) {
+      print('Apple sign-in error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text('${AppLocalizations.signInError}: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isAppleLoading = false);
       }
     }
   }
@@ -246,29 +306,49 @@ class _SignInScreenState extends State<SignInScreen> {
                         vertical: screenHeight * 0.018,
                       ),
                     ),
-                    onPressed: _isGoogleLoading ? null : _signInWithGoogle,
+                    onPressed: Platform.isIOS
+                        ? (_isAppleLoading ? null : _signInWithApple)
+                        : (_isGoogleLoading ? null : _signInWithGoogle),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.start,
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         SizedBox(width: 30.w),
-                        _isGoogleLoading
-                            ? SizedBox(
-                                height: screenHeight * 0.03,
-                                width: screenHeight * 0.03,
-                                child: const CircularProgressIndicator(
-                                    strokeWidth: 2),
-                              )
-                            : Image.asset(
-                                AppImages.googlePng,
-                                height: screenHeight * 0.03,
-                                width: screenHeight * 0.03,
-                              ),
+                        if (Platform.isIOS)
+                          (_isAppleLoading
+                              ? SizedBox(
+                                  height: screenHeight * 0.03,
+                                  width: screenHeight * 0.03,
+                                  child: const CircularProgressIndicator(
+                                      strokeWidth: 2),
+                                )
+                              : Icon(
+                                  Icons.apple,
+                                  size: screenHeight * 0.03,
+                                  color: Colors.black,
+                                ))
+                        else
+                          (_isGoogleLoading
+                              ? SizedBox(
+                                  height: screenHeight * 0.03,
+                                  width: screenHeight * 0.03,
+                                  child: const CircularProgressIndicator(
+                                      strokeWidth: 2),
+                                )
+                              : Image.asset(
+                                  AppImages.googlePng,
+                                  height: screenHeight * 0.03,
+                                  width: screenHeight * 0.03,
+                                )),
                         SizedBox(width: 30.w),
                         TextWidget(
-                          text: _isGoogleLoading
-                              ? AppLocalizations.signingIn
-                              : AppLocalizations.signInWithGoogle,
+                          text: Platform.isIOS
+                              ? ( _isAppleLoading
+                                  ? AppLocalizations.signingIn
+                                  : 'Sign in with Apple')
+                              : (_isGoogleLoading
+                                  ? AppLocalizations.signingIn
+                                  : AppLocalizations.signInWithGoogle),
                           style: GoogleFonts.lato(
                             fontSize: 14.sp,
                             color: const Color(0xFF000000),

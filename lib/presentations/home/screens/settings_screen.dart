@@ -38,6 +38,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final youtubeUrl = Uri.parse('https://www.youtube.com/@RLCommunity-sx6mt');
 
   final twitterUrl = Uri.parse('https://x.com/RLCommunity0');
+  final deleteAccountUrl = Uri.parse('https://forms.gle/wpY1drhr76rHwBGU7');
 
   @override
   void initState() {
@@ -155,8 +156,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             }, false),
                             _buildButton(context, AppLocalizations.contact,
                                 AppImages.contact, () {}, false),
-                            _buildButton(context, AppLocalizations.rateApp,
-                                AppImages.rate, () {}, false),
+                            _buildButton(context, AppLocalizations.deleteAccount,
+                                AppImages.exitgame, () async {
+                              if (await canLaunchUrl(deleteAccountUrl)) {
+                                await launchUrl(deleteAccountUrl,
+                                    mode: LaunchMode.externalApplication);
+                              }
+                            }, false),
                             _buildButton(context, AppLocalizations.logout,
                                 AppImages.exitgame, () {
                               _handleLogout(context);

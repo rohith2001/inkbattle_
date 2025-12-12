@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 
 class AdService {
   // Android App ID: ca-app-pub-2111477197639109~2310576980
@@ -41,11 +42,31 @@ class AdService {
     if (_initialized) return;
     
     try {
+      // On iOS we must request tracking authorization before initializing ads.
+      await _requestTrackingAuthorizationIfNeeded();
+
       await MobileAds.instance.initialize();
       _initialized = true;
     } catch (e) {
       print('Error initializing mobile ads: $e');
       // Don't rethrow - allow app to continue without ads
+    }
+  }
+
+  // Request App Tracking Transparency on iOS before accessing IDFA.
+  static Future<void> _requestTrackingAuthorizationIfNeeded() async {
+    if (!Platform.isIOS) return;
+
+    try {
+      final status = await AppTrackingTransparency.trackingAuthorizationStatus;
+      if (status == TrackingStatus.notDetermined) {
+        // Small delay recommended before showing the system prompt.
+        await Future.delayed(const Duration(milliseconds: 250));
+        await AppTrackingTransparency.requestTrackingAuthorization();
+      }
+    } catch (e) {
+      // Log and continue; ads will fall back to non-personalized if needed.
+      print('ATT request failed: $e');
     }
   }
 

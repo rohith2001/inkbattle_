@@ -69,6 +69,8 @@ dependencies:
   toastification: ^3.0.3
   showcaseview: ^5.0.1
   url_launcher: ^6.3.2
+  app_tracking_transparency: ^2.0.4
+  sign_in_with_apple: ^6.1.0
 
 dev_dependencies:
   flutter_test:
