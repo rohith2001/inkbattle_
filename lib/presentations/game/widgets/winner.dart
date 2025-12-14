@@ -75,22 +75,22 @@ class TeamWinnerPopup extends StatelessWidget {
                     topRight: Radius.circular(18),
                   ),
                 ),
-                child: ClipRect(
-                  child: CustomPaint(
-                    painter: RibbonTextPainter(
-                      text: "CONGRATULATIONS",
-                      textStyle: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontSize: 18.sp,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    child: SizedBox(
-                      width: 200.w,
-                      height: 100.h,
-                    ),
-                  ),
-                ),
+                // child: ClipRect(
+                //   child: CustomPaint(
+                //     painter: RibbonTextPainter(
+                //       text: "CONGRATULATIONS",
+                //       textStyle: GoogleFonts.inter(
+                //         color: Colors.white,
+                //         fontSize: 18.sp,
+                //         fontWeight: FontWeight.w900,
+                //       ),
+                //     ),
+                //     child: SizedBox(
+                //       width: 200.w,
+                //       height: 100.h,
+                //     ),
+                //   ),
+                // ),
               ),
               SizedBox(height: 70.h),
 
@@ -209,7 +209,7 @@ class TeamWinnerPopup extends StatelessWidget {
           ),
           SizedBox(height: 6.h),
           Text(
-            "${team.name}",
+            team.name,
             style: GoogleFonts.lato(
               color: team.name == 'Team A' ? Colors.blue : Colors.orange,
               fontSize: 15.sp,

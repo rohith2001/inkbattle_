@@ -75,39 +75,24 @@ class TeamWinnerPopup extends StatelessWidget {
             children: [
               // --- Ribbon Header ---
               Container(
-                height: isTablet ? 140.h : 100.h,
+                height: isTablet ? 140.h : 140.h,
                 width: double.infinity,
                 decoration: const BoxDecoration(
+                  // color: Colors.red,
                   image: DecorationImage(
-                    image: AssetImage(AppImages.redflg),
-                    fit: BoxFit.contain,
+                    image: AssetImage(AppImages.redflg,),
+                    fit: BoxFit.cover,
                   ),
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(18),
                     topRight: Radius.circular(18),
                   ),
                 ),
-                child: ClipRect(
-                  child: CustomPaint(
-                    painter: RibbonTextPainter(
-                      text: "CONGRATULATIONS",
-                      textStyle: GoogleFonts.inter(
-                        color: Colors.white,
-                        fontSize: 18.sp,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    child: SizedBox(
-                      width: 200.w,
-                      height: 100.h,
-                    ),
-                  ),
-                ),
               ),
               SizedBox(height: 50.h), // Reduce initial gap if 70.h was too much
 
               // --- PODIUM VISUALIZATION AREA (300h) ---
-              Container(
+              SizedBox(
                 width: 300.w,
                 height: 300.h,
                 // Using a Stack to place the podium steps relative to the container center/bottom
@@ -225,10 +210,10 @@ class TeamWinnerPopup extends StatelessWidget {
             : 0;
 
     final List<Color> colors = rank == 1
-        ? [Color.fromRGBO(234, 185, 45, 1), Color.fromRGBO(54, 52, 49, 1)]
+        ? [const Color.fromRGBO(234, 185, 45, 1), const Color.fromRGBO(54, 52, 49, 1)]
         : rank == 2.0
-            ? [Color.fromRGBO(155, 155, 155, 1), Color.fromRGBO(54, 52, 49, 1)]
-            : [Color.fromRGBO(188, 110, 69, 1), Color.fromRGBO(54, 52, 49, 1)];
+            ? [const Color.fromRGBO(155, 155, 155, 1), const Color.fromRGBO(54, 52, 49, 1)]
+            : [const Color.fromRGBO(188, 110, 69, 1), const Color.fromRGBO(54, 52, 49, 1)];
     // Avatar and text column
     final Widget avatarWidget = Column(
       mainAxisSize: MainAxisSize.min,
@@ -240,7 +225,7 @@ class TeamWinnerPopup extends StatelessWidget {
             // Avatar background/border
             Container(
               // margin: EdgeInsets.all(2),
-              padding: EdgeInsets.all(3),
+              padding: const EdgeInsets.all(3),
               decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
@@ -278,7 +263,7 @@ class TeamWinnerPopup extends StatelessWidget {
       ],
     );
     final isTablet = MediaQuery.of(context).size.width > 600;
-    return Container(
+    return SizedBox(
       width: isTablet ? 70.w : 90.w,
       // height: height,
       // color: Colors.white,
@@ -293,7 +278,7 @@ class TeamWinnerPopup extends StatelessWidget {
             child: avatarWidget,
           ),
           Align(
-            alignment: rank == 3 ? Alignment(-1, 1.0) : Alignment(0.0, 1.0),
+            alignment: rank == 3 ? const Alignment(-1, 1.0) : const Alignment(0.0, 1.0),
             child: SizedBox(
               height: podiumHeight,
               child: Image.asset(

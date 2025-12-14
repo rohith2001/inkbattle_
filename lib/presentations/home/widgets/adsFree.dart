@@ -41,7 +41,7 @@ class _AdsFreePopupState extends State<AdsFreePopup> {
   bool _isLoadingAd = false;
   bool _adLoadFailed = false;
   bool _shouldClaimReward = false;
-  bool _isProcessingPayment = false;
+  final bool _isProcessingPayment = false;
 
   @override
   void initState() {

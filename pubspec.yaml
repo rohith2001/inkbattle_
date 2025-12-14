@@ -16,7 +16,7 @@ publish_to: "none" # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+11
+version: 1.0.0+12
 
 environment:
   sdk: ^3.5.4
@@ -58,6 +58,7 @@ dependencies:
   socket_io_client: ^3.1.2
   flutter_colorpicker: ^1.1.0
   google_mobile_ads: ^5.1.0
+  flutter_drawing_board: ^0.9.8
   permission_handler: ^12.0.1
   flutter_webrtc: ^1.2.0
   razorpay_flutter: ^1.3.1
@@ -68,14 +69,17 @@ dependencies:
   agora_rtc_engine: ^6.5.3
   toastification: ^3.0.3
   showcaseview: ^5.0.1
-  url_launcher: ^6.3.2
+  file_saver: ^0.2.9
+  font_awesome_flutter: ^10.6.0
+  url_launcher: ^6.2.1
+  universal_html: ^2.2.4
+  universal_platform: ^1.1.0
+  sign_in_with_apple: ^7.0.1
   app_tracking_transparency: ^2.0.4
-  sign_in_with_apple: ^6.1.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_launcher_icons: ^0.13.1
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -128,10 +132,3 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
-
-# CONFIGURATION FOR ICONS
-flutter_launcher_icons:
-  android: "launcher_icon"
-  ios: true
-  image_path: "asset/logo.png"
-  remove_alpha_ios: true

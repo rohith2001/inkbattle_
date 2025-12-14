@@ -5,7 +5,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:inkbattle_frontend/constants/app_colors.dart';
 import 'package:inkbattle_frontend/constants/app_images.dart';
-import 'package:inkbattle_frontend/constants/image_picker_utils.dart';
 import 'package:inkbattle_frontend/widgets/backgroun_scafold.dart';
 import 'package:inkbattle_frontend/widgets/custom_svg.dart';
 import 'package:inkbattle_frontend/widgets/text_widget.dart';
@@ -199,7 +198,7 @@ class _SignUpScreenState extends State<SignUpScreen>
   Widget _buildFirstPage() {
     double size = 0.15.sw;
     // ADDED: Avatar widgets (from GuestSignUpScreen)
-    List<Widget> _avatars = List.generate(4, (index) {
+    List<Widget> avatars = List.generate(4, (index) {
       return CircleAvatar(
         radius: size / 3,
         backgroundColor: Colors.transparent,
@@ -325,7 +324,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                                 width: 3.w,
                               ),
                             ),
-                            child: _avatars[index]),
+                            child: avatars[index]),
                       ),
                     );
                   }),

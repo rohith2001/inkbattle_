@@ -153,6 +153,8 @@ class AppImages {
   // Animation Videos
   static const String coinRewardAnimation =
       "asset/animationVideos/coin_reward_animation.mp4";
+  static const String treasureBoxVideo =
+      "asset/animationVideos/treasure-box.mp4";
   static const String timeupVideo = "asset/animationVideos/timeup.mov";
   static const String welldoneVideo = "asset/animationVideos/welldonw.mp4";
   static const String whosNextVideo =

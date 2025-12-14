@@ -1,15 +1,12 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui';
+import 'dart:ui' as ui;
 import 'package:audioplayers/audioplayers.dart';
-import 'package:agora_rtc_engine/agora_rtc_engine.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:characters/characters.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -18,16 +15,24 @@ import 'package:inkbattle_frontend/main.dart';
 import 'package:inkbattle_frontend/presentations/home/widgets/round_announcement.dart';
 import 'package:inkbattle_frontend/presentations/widgets/custom_slider.dart';
 import 'package:inkbattle_frontend/presentations/widgets/selecting_drawer.dart';
-import 'package:inkbattle_frontend/repositories/agora_repository.dart';
 import 'package:inkbattle_frontend/repositories/room_repository.dart';
 import 'package:inkbattle_frontend/repositories/theme_repository.dart';
 import 'package:inkbattle_frontend/repositories/user_repository.dart';
 import 'package:inkbattle_frontend/services/ad_service.dart';
 import 'package:inkbattle_frontend/services/socket_service.dart';
-import 'package:inkbattle_frontend/utils/routes/routes.dart';
 import 'package:inkbattle_frontend/widgets/blue_background_scaffold.dart';
+import 'package:inkbattle_frontend/presentations/drawing_board/presentation/widgets/drawing_canvas.dart';
+import 'package:inkbattle_frontend/presentations/drawing_board/domain/models/stroke.dart'
+    as fdb;
+import 'package:inkbattle_frontend/presentations/drawing_board/domain/models/drawing_tool.dart'
+    as fdb_tool;
+import 'package:inkbattle_frontend/presentations/drawing_board/domain/models/drawing_canvas_options.dart'
+    as fdb;
+import 'package:inkbattle_frontend/presentations/drawing_board/presentation/notifiers/current_stroke_value_notifier.dart'
+    as fdb;
+import 'package:inkbattle_frontend/presentations/drawing_board/domain/models/undo_redo_stack.dart'
+    as fdb;
 import 'package:inkbattle_frontend/widgets/coin_animation_dialog.dart';
-import 'package:inkbattle_frontend/widgets/drawing_canvas.dart';
 import 'package:inkbattle_frontend/models/room_model.dart';
 import 'package:inkbattle_frontend/models/user_model.dart';
 import 'package:inkbattle_frontend/utils/preferences/local_preferences.dart';
@@ -37,8 +42,6 @@ import 'package:inkbattle_frontend/presentations/widgets/exit.dart';
 import 'package:inkbattle_frontend/presentations/widgets/report.dart';
 import 'package:inkbattle_frontend/presentations/widgets/teamsview.dart';
 import 'package:inkbattle_frontend/presentations/widgets/winner.dart';
-import 'package:inkbattle_frontend/services/voice_service.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:showcaseview/showcaseview.dart';
 import 'package:toastification/toastification.dart';
 import 'package:video_player/video_player.dart';
@@ -175,15 +178,21 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   final AudioPlayer _gameAudioPlayer = AudioPlayer();
   RoomModel? _room;
   UserModel? _currentUser;
-  List<DrawingPoint> _drawingPoints = [];
+
+  final ValueNotifier<List<fdb.Stroke>> _strokes = ValueNotifier([]);
+  final fdb.CurrentStrokeValueNotifier _currentStroke =
+      fdb.CurrentStrokeValueNotifier();
+  late final fdb.UndoRedoStack _undoRedoStack;
+  final GlobalKey _canvasKey = GlobalKey();
+  final ValueNotifier<bool> _showGrid = ValueNotifier(false);
+  final ValueNotifier<ui.Image?> _backgroundImage = ValueNotifier(null);
+  final ValueNotifier<int> _polygonSides = ValueNotifier(3);
+
   final List<Map<String, dynamic>> _chatMessages = [];
   final List<Map<String, dynamic>> _answersChatMessages = [];
   List<RoomParticipant> _participants = [];
   RoomParticipant? _currentParticipant;
   DrawingTool _currentTool = DrawingTool.pencil;
-  List<List<DrawingPoint>> _drawingHistory = [];
-  int _historyIndex = -1;
-  Offset? _shapeStartPoint;
 
   final GlobalKey _guesserBoardLayoutKey = GlobalKey();
   final GlobalKey _drawerBoardLayoutKey = GlobalKey();
@@ -277,7 +286,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     ),
   ];
   final universalBorder =
-      BoxBorder.all(color: Color.fromARGB(255, 38, 37, 37), width: 1);
+      BoxBorder.all(color: const Color.fromARGB(255, 38, 37, 37), width: 1);
 
   final List<Color> _colorPalette = [
     // Row 1: Bright Primaries, Secondaries, and Neon Accents
@@ -286,21 +295,21 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     Colors.green,
     Colors.blue,
     Colors.yellow,
-    Color(0xFFFF00FF), // Neon Magenta
+    const Color(0xFFFF00FF), // Neon Magenta
 
     // Row 2: Deep & Warm Tones
     Colors.pink,
     Colors.orange,
     Colors.cyan,
     Colors.lightGreen,
-    Color(0xFF6F3CFF), // Deep Violet
-    Color(0xFFE53935), // Crimson Red
+    const Color(0xFF6F3CFF), // Deep Violet
+    const Color(0xFFE53935), // Crimson Red
 
     // Row 3: Dark & Neutral Bases
     Colors.black,
-    Color(0xFFC70039), // Raspberry
-    Color(0xFF900C3F), // Wine
-    Color(0xFF581845), // Dark Plum
+    const Color(0xFFC70039), // Raspberry
+    const Color(0xFF900C3F), // Wine
+    const Color(0xFF581845), // Dark Plum
     Colors.brown,
     Colors.teal,
 
@@ -315,18 +324,18 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     // Row 5: Blues and Sea Greens
     Colors.lightBlue,
     Colors.indigoAccent,
-    Color(0xFF00FFFF), // Electric Cyan
-    Color(0xFF00AAFF), // Azure Blue
+    const Color(0xFF00FFFF), // Electric Cyan
+    const Color(0xFF00AAFF), // Azure Blue
     Colors.lightGreenAccent,
     Colors.tealAccent,
 
     // Row 6: Earthy and Muted Hues
-    Color(0xFFA0522D), // Sienna
-    Color(0xFFF0E68C), // Khaki
-    Color(0xFFDDA0DD), // Plum
-    Color(0xFF808000), // Olive
-    Color(0xFF483D8B), // Slate Blue
-    Color(0xFFD3D3D3), // Light Grey
+    const Color(0xFFA0522D), // Sienna
+    const Color(0xFFF0E68C), // Khaki
+    const Color(0xFFDDA0DD), // Plum
+    const Color(0xFF808000), // Olive
+    const Color(0xFF483D8B), // Slate Blue
+    const Color(0xFFD3D3D3), // Light Grey
   ];
   String? _currentDrawerMessageKey;
 
@@ -361,7 +370,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   bool _showWordHint = false; // Whether to show dashes/hints
 
   // Drawing tools collapse state
-  bool _showDrawingTools = false;
+  final bool _showDrawingTools = false;
 
   // Lobby settings
   String? selectedLanguage;
@@ -372,7 +381,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   String? selectedGameMode = '1v1';
   bool voiceEnabled = false;
   bool isPublic = false;
-  int maxPlayers = 0;
+  int maxPlayers = 5;
   String? selectedTeam;
 
   bool isShowCaseShown = false;
@@ -391,7 +400,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   static const int _speakingThreshold = 10; // Volume threshold (0-255 scale)
 
   // UI parity with CreateRoom screen
-  int players = 0;
+  int players = 5;
   String? selectedGamePlay; // "1 vs 1", "2 vs 2", "3 vs 3"
   int coins = 250; // display-only per UI
 
@@ -411,7 +420,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     '🇩🇪 Germany',
     '🇷🇺 Russia'
   ];
-  List<int> pointsOptions = [50, 100, 150, 200];
+  List<int> pointsOptions = [10, 50, 100, 150, 200];
   List<String> categories = [];
 
   late RoundAnnouncementManager _announcementManager;
@@ -428,6 +437,11 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   @override
   void initState() {
     super.initState();
+
+    _undoRedoStack = fdb.UndoRedoStack(
+      strokesNotifier: _strokes,
+      currentStrokeNotifier: _currentStroke,
+    );
 
     // Initialize progress animation controller
     _progressAnimationController = AnimationController(
@@ -461,57 +475,57 @@ class _GameRoomScreenState extends State<GameRoomScreen>
 
   Future<void> _preloadVideos() async {
     try {
-      print('📍 Starting video preload...');
+      
 
       // Preload timeup video
-      print('📍 Loading timeup video: ${AppImages.timeupVideo}');
+      
       _timeupVideoController =
           VideoPlayerController.asset(AppImages.timeupVideo);
       await _timeupVideoController!.initialize();
       _timeupVideoController!.setLooping(true);
-      print('✅ Timeup video loaded successfully');
+      
 
       // Preload who's next video
-      print('📍 Loading who\'s next video: ${AppImages.whosNextVideo}');
+      
       _whosNextVideoController =
           VideoPlayerController.asset(AppImages.whosNextVideo);
       await _whosNextVideoController!.initialize();
       _whosNextVideoController!.setLooping(true);
-      print('✅ Who\'s next video loaded successfully');
+      
 
       // Preload well done video
-      print('📍 Loading well done video: ${AppImages.welldoneVideo}');
+      
       _welldoneVideoController =
           VideoPlayerController.asset(AppImages.welldoneVideo);
       await _welldoneVideoController!.initialize();
       _welldoneVideoController!.setLooping(true);
-      print('✅ Well done video loaded successfully');
+      
 
       // Preload interval video
-      print('📍 Loading interval video: ${AppImages.intervalVideo}');
+      
       _intervalVideoController =
           VideoPlayerController.asset(AppImages.intervalVideo);
       await _intervalVideoController!.initialize();
       _intervalVideoController!.setLooping(true);
-      print('✅ Interval video loaded successfully');
+      
 
       // Preload lost turn video
-      print('📍 Loading lost turn video: ${AppImages.lostTurnVideo}');
+      
       _lostTurnVideoController =
           VideoPlayerController.asset(AppImages.lostTurnVideo);
       await _lostTurnVideoController!.initialize();
       _lostTurnVideoController!.setLooping(true);
-      print('✅ Lost turn video loaded successfully');
+      
 
       if (mounted) {
         setState(() {
           _videosPreloaded = true;
         });
       }
-      print('✅ All animation videos preloaded successfully');
+      
     } catch (e, stackTrace) {
-      print('❌ Error preloading videos: $e');
-      print('❌ Stack trace: $stackTrace');
+      
+      
     }
   }
 
@@ -528,11 +542,11 @@ class _GameRoomScreenState extends State<GameRoomScreen>
               _bannerAd = ad as BannerAd;
               _isBannerAdLoaded = true;
             });
-            print('✅ Banner ad loaded successfully');
+            
           }
         },
         onAdFailedToLoad: (ad, error) {
-          print('❌ Banner ad failed to load: $error');
+          
           if (mounted) {
             setState(() {
               _isBannerAdLoaded = false;
@@ -541,7 +555,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         },
       );
     } catch (e) {
-      print('Error loading banner ad: $e');
+      
     }
   }
 
@@ -745,16 +759,19 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             selectedGameMode = room.gameMode ?? '1v1';
             voiceEnabled = room.voiceEnabled ?? false;
             isPublic = room.isPublic ?? false;
-            maxPlayers = room.maxPlayers ?? 5;
-            // Map to CreateRoom UI fields - default to 5, but respect room's maxPlayers as limit
-            players = 5;
+            // Default to 5 if maxPlayers is null or 0 (for UI display)
+            maxPlayers = (room.maxPlayers != null && room.maxPlayers! > 0)
+                ? room.maxPlayers!
+                : 5;
+            // Sync players variable with maxPlayers from room
+            players = maxPlayers;
             selectedGamePlay =
                 (selectedGameMode == '1v1') ? '1 vs 1' : '2 vs 2';
             _hasShownTeamScoreIntro = false;
             _showTeamScoreboard = false;
           });
           _connectSocket();
-          print("connecting to sockettttttt");
+          
           // Initialize voice if enabled
           // if (voiceEnabled) {
           //   _initializeVoice();
@@ -770,7 +787,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       );
 
       if (widget.selectedTeam != null) {
-        await Future.delayed(Duration(seconds: 1));
+        await Future.delayed(const Duration(seconds: 1));
         selectedTeam = widget.selectedTeam!;
 
         _selectTeam(selectedTeam!);
@@ -843,10 +860,10 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   //         }
   //       },
   //       onUserJoined: (connection, remoteUid, elapsed) {
-  //         print("User $remoteUid joined voice channel");
+  //         
   //       },
   //       onJoinChannelSuccess: (connection, elapsed) {
-  //         print('✅ Joined channel success: ${connection.channelId}');
+  //         
   //         _voiceService.engine!.setEnableSpeakerphone(true);
   //         _voiceService.engine!.enableAudioVolumeIndication(
   //           interval: 200,
@@ -927,7 +944,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
 
     _socketService.onRoomJoined((data) {
       if (mounted) {
-        print('Room joined: $data');
+        
         final room = data['room'];
         final participants = data['participants'] as List?;
         setState(() {
@@ -944,7 +961,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
 
     _socketService.onRoomParticipants((data) {
       if (mounted) {
-        print('Room participants updated: $data');
+        
         final participantsData = data['participants'] as List?;
         if (participantsData != null && participantsData.isNotEmpty) {
           final newParticipants =
@@ -952,11 +969,11 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           setState(() {
             _participants = newParticipants;
           });
-          _participants.forEach((participant) {
+          for (var participant in _participants) {
             if (participant.id == _currentUser?.id) {
               _currentParticipant = participant;
             }
-          });
+          }
         }
       }
     });
@@ -967,6 +984,33 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           _chatMessages
               .add({'type': 'system', 'message': '${data['userName']} joined'});
         });
+      }
+    });
+    _socketService.onPlayerRemoved((data){
+      /* Data :
+      {
+      userId,
+      name: user ? user.name : "Guest",
+      reason: "failed_to_choose_word",
+      }
+       */
+      if (mounted) {
+        final userName = data['name'] ?? 'A player';
+        setState(() {
+          _chatMessages.add({'type': 'system', 'message': '$userName was removed from the game'});
+        });
+        // Show snackbar notification
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '$userName was removed from the game for not selecting a word in a row',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        _leaveRoom();
       }
     });
 
@@ -993,62 +1037,28 @@ class _GameRoomScreenState extends State<GameRoomScreen>
 
     _socketService.onDrawingData((data) {
       if (!mounted || _isDrawer) return;
-
       try {
-        print('📥 Received drawing data: $data');
-        final Map<String, dynamic> strokeData =
-            data['strokes'] as Map<String, dynamic>;
-
-        // 1. Extract Normalized Coordinates (0.0 to 1.0)
-        final double? normalizedX = (strokeData['x'] as num?)?.toDouble();
-        final double? normalizedY = (strokeData['y'] as num?)?.toDouble();
-
-        // 2. Extract Sender Canvas Dimensions (CRITICAL for aspect ratio)
-        final double? senderWidth =
-            (strokeData['canvas_width'] as num?)?.toDouble();
-        final double? senderHeight =
-            (strokeData['canvas_height'] as num?)?.toDouble();
-
-        // 3. Create the DrawingPoint (stores the normalized data)
-        final point = DrawingPoint(
-          // Store the received normalized ratio (0.0 to 1.0)
-          normalizedOffset: (normalizedX != null && normalizedY != null)
-              ? Offset(normalizedX, normalizedY)
-              : null,
-
-          // Store the original size for aspect ratio calculation in the Painter
-          originalCanvasSize: (senderWidth != null && senderHeight != null)
-              ? Size(senderWidth, senderHeight)
-              : null,
-
-          paint: (strokeData['color'] != null &&
-                  strokeData['strokeWidth'] != null)
-              ? (Paint()
-                ..color = Color(strokeData['color'] as int)
-                ..strokeWidth = (strokeData['strokeWidth'] as num).toDouble()
-                ..strokeCap = StrokeCap.round)
-              : null,
-        );
-
-        // 4. Update UI
-        setState(() {
-          _drawingPoints = List<DrawingPoint>.from(_drawingPoints)..add(point);
-        });
-      } catch (e, stackTrace) {
-        print('❌ Error processing drawing point: $e');
-        print('Stack Trace: $stackTrace');
+        final strokeData = data['strokes'];
+        if (strokeData != null) {
+          final stroke = fdb.Stroke.fromJson(strokeData);
+          _strokes.value = List<fdb.Stroke>.from(_strokes.value)..add(stroke);
+        }
+      } catch (e) {
+        
       }
     });
+
     _socketService.onClearCanvas((data) {
       if (mounted) {
         setState(() {
-          _drawingPoints.clear();
+          _strokes.value = [];
+          _currentStroke.clear();
         });
       }
     });
 
     _socketService.onLobbyTimeExceeded((data) {
-      print("heee");
+      
       final message = data["message"];
       showDialog(
         context: context,
@@ -1060,8 +1070,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                 _leaveRoom();
               },
               continueWaiting: () {
-                if (_room != null)
+                if (_room != null) {
                   _socketService.continueWaiting(_room!.id.toString());
+                }
               });
         },
       );
@@ -1080,7 +1091,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
               'userName': user != null ? user['name'] : 'Unknown',
               'message': message,
               'avatar': user['avatar'],
-              'team': selectedTeam,
+              'team': user['team'], // Ensure team is parsed from user object
               'userId': user['id'],
             });
           }
@@ -1105,7 +1116,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       final user = data['user'];
       final roomId = data['roomId'] ?? '';
       // showChatToast('System', message);
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("System: " + message),
@@ -1113,6 +1124,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             duration: const Duration(seconds: 2),
           ),
         );
+      }
     });
     _socketService.onUserKickedFromGame((data) {
       /* {
@@ -1223,6 +1235,8 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     });
 
     _socketService.onSettingsUpdated((data) {
+      print(
+          '🟢 CLIENT: Received settings_updated event with data: ${data['maxPlayers']}');
       if (mounted) {
         setState(() {
           selectedGameMode = data['gameMode'];
@@ -1245,7 +1259,12 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           // });
 
           isPublic = data['isPublic'] ?? false;
-          maxPlayers = data['maxPlayers'] ?? 5;
+          // Default to 5 if maxPlayers is null or 0 (for UI display)
+          maxPlayers = (data['maxPlayers'] != null && data['maxPlayers'] > 0)
+              ? data['maxPlayers']
+              : 5;
+          players = maxPlayers; // Sync players variable with maxPlayers
+          
           if (data['status'] != null && _room != null) {
             _room!.status = data['status'];
             _waitingForPlayers =
@@ -1338,10 +1357,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             _currentDrawerMessageKey = null;
 
             // Clear canvas but PRESERVE size
-            _drawingPoints.clear();
-            _drawingHistory.clear();
-            _historyIndex = -1;
-            _shapeStartPoint = null;
+            _strokes.value = [];
+            _currentStroke.clear();
+            _undoRedoStack.clear();
             // RESTORE board size immediately!
             _drawerBoardSize = savedSize;
             _lastKnownBoardSize = savedSize;
@@ -1351,12 +1369,13 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             _currentWordForDashes = null;
             _showWordHint = false;
             if (_isDrawer) {
-              print("Helloo");
-              print(lastPhaseTimeRemaining);
-              if (lastPhaseTimeRemaining > 2)
+              
+              
+              if (lastPhaseTimeRemaining > 2) {
                 _announcementManager.startAnnouncementSequence(isTimeUp: false);
-              else
+              } else {
                 _announcementManager.startAnnouncementSequence(isTimeUp: true);
+              }
             }
             // DON'T clear canvas during reveal
           } else if (nextPhase == 'interval') {
@@ -1375,19 +1394,17 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             _currentDrawerMessageKey = null;
 
             // Clear canvas but PRESERVE size
-            _drawingPoints.clear();
-            _drawingHistory.clear();
-            _historyIndex = -1;
-            _shapeStartPoint = null;
+            _strokes.value = [];
+            _currentStroke.clear();
+            _undoRedoStack.clear();
             _drawerBoardSize = savedSize;
             _lastKnownBoardSize = savedSize;
           } else if (nextPhase == 'choosing_word') {
             _isIntervalPhase = false;
             _currentWord = null;
-            _drawingPoints.clear();
-            _drawingHistory.clear();
-            _historyIndex = -1;
-            _shapeStartPoint = null;
+            _strokes.value = [];
+            _currentStroke.clear();
+            _undoRedoStack.clear();
             _drawerBoardSize = savedSize;
             _lastKnownBoardSize = savedSize;
           }
@@ -1418,10 +1435,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           _currentDrawerMessageKey = null;
           _isLeaderboardVisible = false;
 
-          _drawingPoints.clear();
-          _drawingHistory.clear();
-          _historyIndex = -1;
-          _shapeStartPoint = null;
+          _strokes.value = [];
+          _currentStroke.clear();
+          _undoRedoStack.clear();
 
           _drawerBoardSize = savedDrawerSize;
           _guesserBoardSize = savedGuesserSize;
@@ -1443,9 +1459,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           }
         });
 
-        print('🎨 Drawer selected. Sizes preserved:');
-        print('   Drawer: $_drawerBoardSize');
-        print('   Guesser: $_guesserBoardSize');
+        
+        
+        
 
         if (_activeDrawingBoardSize == Size.zero) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1536,6 +1552,10 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       if (mounted) {
         setState(() {
           _phaseTimeRemaining = data['remainingTime'] ?? 0;
+          if (_phaseMaxTime > 0) {
+            final double progress = _phaseTimeRemaining / _phaseMaxTime;
+            _updateProgressAnimation(progress);
+          }
         });
       }
     });
@@ -1602,7 +1622,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         _resetTeamScoreboardAnimation();
         _loadCloseRewardedAd(); // Load ad when game ends
         final rankings = data['rankings'] as List?;
-        Future.delayed(Duration(milliseconds: 7000), () {
+        Future.delayed(const Duration(milliseconds: 7000), () {
           _showGameEndDialog(rankings);
         });
       }
@@ -1638,10 +1658,13 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           _currentDrawerMessageKey = null;
 
           // ✅ CLEAR CANVAS on round start
-          _drawingPoints.clear();
-          _drawingHistory.clear();
-          _historyIndex = -1;
-          _shapeStartPoint = null;
+          _strokes.value = [];
+          _currentStroke.clear();
+          try {
+            _undoRedoStack.clear();
+          } catch (e) {
+            
+          }
         });
       }
     });
@@ -1649,7 +1672,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     _socketService.onCorrectGuess((data) {
       if (mounted) {
         final dynamic participant = data['participant'];
-        print("participant : $participant");
+        
         final String guessText = data['guess'] ?? '';
         setState(() {
           int? participantId;
@@ -1679,8 +1702,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             if (participantId.toString() ==
                     _currentParticipant?.id.toString() ||
                 participantId.toString() ==
-                    _currentParticipant!.user!.id.toString())
+                    _currentParticipant!.user!.id.toString()) {
               isAnsweredCorrectly = true;
+            }
 
             if (participant['score'] is int) {
               participantScore = participant['score'] as int;
@@ -1724,7 +1748,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
               (participantIdStr == _currentUser?.id?.toString() ||
                   m['userName'] == userName ||
                   m['message'] == guessText));
-          print('${_currentUser?.avatar ?? _currentUser?.profilePicture}');
+          
           _answersChatMessages.add({
             'type': 'correct',
             'userName': userName,
@@ -1733,7 +1757,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             'userId': participantIdStr,
             'avatar':
                 _currentUser?.profilePicture ?? _currentUser?.avatar ?? '',
-            'team': selectedTeam,
+            'team': _currentParticipant?.team,
           });
         });
 
@@ -1771,7 +1795,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                 m['type'] == 'incorrect');
 
             if (existingIndex == -1) {
-              print('${_currentUser?.avatar ?? _currentUser?.profilePicture}');
+              
               _answersChatMessages.add({
                 'type': 'incorrect',
                 'userName': userName,
@@ -1780,15 +1804,15 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                 'userId': userId,
                 'avatar':
                     _currentUser?.profilePicture ?? _currentUser?.avatar ?? '',
-                'team': selectedTeam,
+                'team': user['team'],
               });
             }
           });
 
           // Show toast notification for drawer
-          // if (_isDrawer) {
-          //   _showGuessToast(userName, guessText, false);
-          // }
+          if (_isDrawer) {
+            _showGuessToast(userName, guessText, false);
+          }
 
           _scrollAnswersToBottom();
         }
@@ -1798,33 +1822,28 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     _socketService.onRequestCanvasData((data) async {
       ///  {roomCode: room.code,
       ///  targetSocketId: resumingSocketId }
-      print('Received request for canvas data');
+      
       final canvasData = data as Map<String, dynamic>;
       final roomCode = canvasData['roomCode'];
       final targetSocketId = canvasData['targetSocketId'];
-      _socketService.sendCanvasData(roomCode, targetSocketId, _drawingPoints,
+      _socketService.sendCanvasData(
+          roomCode,
+          targetSocketId,
+          _strokes.value.map((e) => e.toJson()).toList(),
           (_phaseTimeRemaining).toDouble());
     });
 
     _socketService.onCanvasDataReceived((data) async {
-      /// {
-      /// roomCode: roomCode,
-      ///history: history,
-      ///}
       final canvasData = data as Map<String, dynamic>;
-      final roomCode = canvasData['roomCode'];
-      final List<DrawingPoint> history = (canvasData['history'] as List)
-          .map((e) => DrawingPoint.fromMap(Map<String, dynamic>.from(e)))
+      final List<dynamic> historyData = canvasData['history'] as List;
+      final List<fdb.Stroke> history = historyData
+          .map((e) => fdb.Stroke.fromJson(Map<String, dynamic>.from(e)))
           .toList();
       _room = RoomModel.fromJson(Map<String, dynamic>.from(data['room']));
       _currentPhase = _room?.roundPhase;
       _phaseTimeRemaining = canvasData['remainingTime'];
       if (mounted) {
-        setState(() {
-          _drawingPoints.addAll(
-            history,
-          );
-        });
+        _strokes.value = history;
       }
     });
     _socketService.onCanvasClear((data) {
@@ -1834,14 +1853,14 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         final savedSize = _drawerBoardSize;
 
         setState(() {
-          _drawingPoints.clear(); // Clear the list but keep the reference
+          _strokes.value = [];
           // Alternative: _drawingPoints = []; // This also works
         });
 
         // Restore the board size immediately after setState
         _drawerBoardSize = savedSize;
 
-        print('🧹 Canvas cleared. Board size preserved: $_drawerBoardSize');
+        
 
         // If size was lost (Size.zero), try to recapture it
         if (_drawerBoardSize == Size.zero) {
@@ -1881,7 +1900,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     });
 
     _socketService.socket?.on('error', (data) {
-      print(data);
+      
       if (mounted) {
         final message = data['message'] ?? 'Unknown error';
         final details = data['details'] ?? '';
@@ -1899,7 +1918,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                 details.isNotEmpty ? details : 'Insufficient coins to start';
             break;
           case 'both_teams_need_players':
-            errorMessage = 'Both teams need at least one player';
+            errorMessage = 'Both teams need at least 2 player';
             break;
           case 'not_team_mode':
             errorMessage = details.isNotEmpty
@@ -1970,7 +1989,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         _lostTurnVideoController?.setVolume(_volume);
       } catch (e) {
         // Handle the case where the player is not initialized or fails to set volume
-        print('Error setting game volume: $e');
+        
       }
 
       // Uncomment and use this block if you are using a dedicated voice service
@@ -1995,21 +2014,13 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   void _clearCanvas() {
-    // Save the current board size BEFORE clearing
     final savedSize = _drawerBoardSize;
-
-    setState(() {
-      _drawingPoints.clear();
-      _drawingHistory.clear();
-      _historyIndex = -1;
-      _shapeStartPoint = null;
-      // Preserve board size!
-      _drawerBoardSize = savedSize;
-      _lastKnownBoardSize = savedSize; // Cache it
-    });
-
+    _strokes.value = [];
+    _currentStroke.clear();
+    _undoRedoStack.clear();
+    _drawerBoardSize = savedSize;
+    _lastKnownBoardSize = savedSize;
     _socketService.clearCanvas(widget.roomId);
-    print('🧹 Canvas cleared. Board size preserved: $_drawerBoardSize');
   }
 
   Size _getGuesserBoardSize() {
@@ -2031,12 +2042,13 @@ class _GameRoomScreenState extends State<GameRoomScreen>
 
     // Add to answers chat immediately (will be updated when server confirms)
     setState(() {
-      print('${_currentUser?.avatar ?? _currentUser?.profilePicture}');
+      
       _answersChatMessages.add({
         'type': 'pending',
         'userName': _currentUser?.name ?? 'You',
         'message': answer,
         'isCorrect': false,
+        'team': selectedTeam,
         'userId': _currentUser?.id?.toString(),
         'avatar': _currentUser?.avatar ?? _currentUser?.profilePicture
       });
@@ -2068,7 +2080,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     await Future.delayed(const Duration(milliseconds: 1000));
     await _refreshUserData();
 
-    print('✅ Game started - coins deducted from all players');
+    
   }
 
   void _leaveRoom() async {
@@ -2099,85 +2111,22 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   void _undo() {
-    if (_historyIndex > 0) {
-      setState(() {
-        _historyIndex--;
-        _drawingPoints =
-            List<DrawingPoint>.from(_drawingHistory[_historyIndex]);
-        _shapeStartPoint = null;
-      });
-
+    if (_undoRedoStack.canUndo.value) {
+      _undoRedoStack.undo();
       _socketService.clearCanvas(widget.roomId);
-
-      Future.delayed(const Duration(milliseconds: 100), () {
-        final Size currentBoardSize = _activeDrawingBoardSize;
-
-        for (final stroke in _drawingPoints) {
-          Map<String, dynamic> pointData = {
-            // FIX: Points are already normalized (0.0-1.0). Do not divide again.
-            'x': stroke.normalizedOffset?.dx,
-            'y': stroke.normalizedOffset?.dy,
-            'color': stroke.paint?.color.value,
-            'strokeWidth': stroke.paint?.strokeWidth,
-            'canvas_height': currentBoardSize.height,
-            'canvas_width': currentBoardSize.width,
-          };
-          _socketService.sendDrawing(widget.roomId, pointData);
-        }
-      });
-    } else if (_historyIndex == 0) {
-      _clearCanvas();
-      setState(() {
-        _drawingHistory.clear();
-        _historyIndex = -1;
-      });
+      for (final stroke in _strokes.value) {
+        _socketService.sendDrawing(widget.roomId, stroke.toJson());
+      }
     }
   }
 
   void _redo() {
-    if (_historyIndex < _drawingHistory.length - 1) {
-      setState(() {
-        _historyIndex++;
-        _drawingPoints =
-            List<DrawingPoint>.from(_drawingHistory[_historyIndex]);
-        _shapeStartPoint = null;
-      });
-
+    if (_undoRedoStack.canRedo.value) {
+      _undoRedoStack.redo();
       _socketService.clearCanvas(widget.roomId);
-
-      Future.delayed(const Duration(milliseconds: 100), () {
-        final Size currentBoardSize = _activeDrawingBoardSize;
-
-        for (final stroke in _drawingPoints) {
-          Map<String, dynamic> pointData = {
-            // FIX: Points are already normalized (0.0-1.0). Do not divide again.
-            'x': stroke.normalizedOffset?.dx,
-            'y': stroke.normalizedOffset?.dy,
-            'color': stroke.paint?.color.value,
-            'strokeWidth': stroke.paint?.strokeWidth,
-            'canvas_height': currentBoardSize.height,
-            'canvas_width': currentBoardSize.width,
-          };
-          _socketService.sendDrawing(widget.roomId, pointData);
-        }
-      });
-    }
-  }
-
-  void _saveToHistory() {
-    // Remove any future history if we're not at the end
-    if (_historyIndex < _drawingHistory.length - 1) {
-      _drawingHistory = _drawingHistory.sublist(0, _historyIndex + 1);
-    }
-
-    // Add current state to history
-    _drawingHistory.add(List<DrawingPoint>.from(_drawingPoints));
-    _historyIndex++;
-
-    // Limit history to 50 states to prevent memory issues
-    if (_drawingHistory.length > 50) {
-      _drawingHistory.removeAt(0);
-      _historyIndex--;
+      for (final stroke in _strokes.value) {
+        _socketService.sendDrawing(widget.roomId, stroke.toJson());
+      }
     }
   }
 
@@ -2210,135 +2159,8 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     );
   }
 
-  void _onDrawingPointAdded(DrawingPoint point) {
-    if (!_isDrawer) return;
-
-    final int lastNonNullIndex =
-        _drawingPoints.lastIndexWhere((p) => p.normalizedOffset != null);
-
-    if (_currentTool == DrawingTool.circle ||
-        _currentTool == DrawingTool.filledCircle ||
-        _currentTool == DrawingTool.rectangle ||
-        _currentTool == DrawingTool.filledRectangle) {
-      if (point.normalizedOffset != null) {
-        if (_shapeStartPoint == null) {
-          _shapeStartPoint = point.normalizedOffset;
-        }
-        setState(() {
-          _drawingPoints = List<DrawingPoint>.from(_drawingPoints)..add(point);
-        });
-        return;
-      } else {
-        // PHASE 3: Drag End - Generate and send final shape
-        if (_shapeStartPoint != null && lastNonNullIndex != -1) {
-          // 1. Get the current canvas size to convert normalized 0-1 to Pixels
-          final Size boardSize = _activeDrawingBoardSize;
-
-          // 2. Convert Normalized -> Pixels
-          final Offset startPixel = Offset(
-              _shapeStartPoint!.dx * boardSize.width,
-              _shapeStartPoint!.dy * boardSize.height);
-
-          final Offset endNormalized =
-              _drawingPoints[lastNonNullIndex].normalizedOffset!;
-          final Offset endPixel = Offset(endNormalized.dx * boardSize.width,
-              endNormalized.dy * boardSize.height);
-
-          // 3. Generate Points in Pixels
-          final List<DrawingPoint> pixelShapePoints =
-              _generateShapePoints(startPixel, endPixel);
-
-          // 4. Convert Pixels -> Normalized for storage/sending
-          final List<DrawingPoint> normalizedShapePoints =
-              pixelShapePoints.map((p) {
-            if (p.normalizedOffset == null) return p;
-            return DrawingPoint(
-              normalizedOffset: Offset(
-                (p.normalizedOffset!.dx / boardSize.width).clamp(0.0, 1.0),
-                (p.normalizedOffset!.dy / boardSize.height).clamp(0.0, 1.0),
-              ),
-              paint: p.paint,
-              originalCanvasSize: boardSize,
-            );
-          }).toList();
-
-          final int lastStrokeBreakIndex = _drawingPoints.lastIndexWhere(
-              (p) => p.normalizedOffset == null, lastNonNullIndex - 1);
-          final int startIndex =
-              lastStrokeBreakIndex == -1 ? 0 : lastStrokeBreakIndex + 1;
-
-          // Remove local preview points
-          if (startIndex < _drawingPoints.length) {
-            _drawingPoints.removeRange(startIndex, _drawingPoints.length);
-          }
-
-          // Add generated shape
-          _drawingPoints.addAll(normalizedShapePoints);
-          _drawingPoints.add(point); // Add null terminator
-
-          // Send generated shape
-          for (final shapePoint in normalizedShapePoints) {
-            _socketService.sendDrawing(widget.roomId, shapePoint.toJson());
-          }
-
-          // Send null terminator
-          _socketService.sendDrawing(widget.roomId, point.toJson());
-
-          _saveToHistory();
-          _shapeStartPoint = null;
-
-          setState(() {});
-          return;
-        }
-
-        if (point.normalizedOffset == null) {
-          _shapeStartPoint = null;
-          _saveToHistory();
-          _socketService.sendDrawing(widget.roomId, point.toJson());
-        }
-        return;
-      }
-    }
-    // --- 2. Handle Pencil/Eraser ---
-
-    // ✅ The complex normalization calculation is GONE!
-    final Map<String, dynamic> basePointData = point.toJson();
-
-    switch (_currentTool) {
-      case DrawingTool.eraser:
-        final eraserPoint = DrawingPoint(
-          normalizedOffset: point.normalizedOffset, // Renamed
-          originalCanvasSize: point.originalCanvasSize, // Pass size through
-          paint: Paint()
-            ..color = const Color(0xFF111111) // Match canvas background
-            ..strokeWidth = _strokeWidth * 3
-            ..strokeCap = StrokeCap.round,
-        );
-        setState(() {
-          _drawingPoints = List<DrawingPoint>.from(_drawingPoints)
-            ..add(eraserPoint);
-        });
-
-        // Update pointData for eraser (only color and width need update)
-        final Map<String, dynamic> eraserData = eraserPoint.toJson();
-
-        _socketService.sendDrawing(widget.roomId, eraserData);
-        if (point.normalizedOffset == null) _saveToHistory(); // Renamed
-        break;
-
-      case DrawingTool.pencil:
-      default:
-        setState(() {
-          _drawingPoints = List<DrawingPoint>.from(_drawingPoints)..add(point);
-        });
-        _socketService.sendDrawing(widget.roomId, basePointData);
-        if (point.normalizedOffset == null) _saveToHistory(); // Renamed
-        break;
-    }
-  }
-
   Widget _showWordSelectionDialog() {
-    if (_wordOptions == null || _wordOptions!.isEmpty) return SizedBox.shrink();
+    if (_wordOptions == null || _wordOptions!.isEmpty) return const SizedBox.shrink();
     return Container(
       width: double.infinity,
       // height: double.infinity,
@@ -2389,7 +2211,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           backgroundColor: Colors.transparent,
           padding: EdgeInsets.symmetric(vertical: 5.h),
           shape: RoundedRectangleBorder(
-            side: BorderSide(color: Colors.white, width: 2),
+            side: const BorderSide(color: Colors.white, width: 2),
             borderRadius: BorderRadius.circular(20.r),
           ),
         ),
@@ -2458,7 +2280,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
               ),
             ];
           } else {
-            _participants.sort((a, b) => b!.score!.compareTo(a!.score!));
+            _participants.sort((a, b) => b.score!.compareTo(a.score!));
 
             var topPlayers = _participants.take(3).toList();
             teams = topPlayers.map((player) {
@@ -2484,7 +2306,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     teams: teams,
                     isTeamvTeam: isTeamMode,
                     onNext: () {
-                      _toggleLeaderboard();
+                      _toggleLeaderboard(closeRoom: true);
                     },
                   ),
                 );
@@ -2519,7 +2341,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           ),
         ];
       } else {
-        _participants.sort((a, b) => b!.score!.compareTo(a!.score!));
+        _participants.sort((a, b) => b.score!.compareTo(a.score!));
         var topPlayers = _participants.take(3).toList();
         teams = topPlayers.map((player) {
           return Team(
@@ -2544,7 +2366,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                 teams: teams,
                 isTeamvTeam: isTeamMode,
                 onNext: () {
-                  _toggleLeaderboard();
+                  _toggleLeaderboard(closeRoom: true);
                 },
               ),
             );
@@ -2569,11 +2391,11 @@ class _GameRoomScreenState extends State<GameRoomScreen>
               _closeRewardedAd = ad;
               _isLoadingCloseAd = false;
             });
-            print('✅ Close RewardedAd loaded successfully');
+            
           }
         },
         onAdFailedToLoad: (error) {
-          print('❌ Close RewardedAd failed to load: $error');
+          
           if (mounted) {
             setState(() {
               _isLoadingCloseAd = false;
@@ -2582,7 +2404,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         },
       );
     } catch (e) {
-      print('Error loading close ad: $e');
+      
       if (mounted) {
         setState(() {
           _isLoadingCloseAd = false;
@@ -2593,7 +2415,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
 
   Future<void> _showCloseAdAndNavigate() async {
     if (_closeRewardedAd == null) {
-      print('⚠️ No ad loaded, navigating directly');
+      
       _toggleLeaderboard(closeRoom: true);
       return;
     }
@@ -2604,14 +2426,14 @@ class _GameRoomScreenState extends State<GameRoomScreen>
 
       ad.fullScreenContentCallback = FullScreenContentCallback(
         onAdDismissedFullScreenContent: (dismissedAd) {
-          print('✅ Close ad dismissed, navigating to lobby');
+          
           dismissedAd.dispose();
           if (mounted) {
             _toggleLeaderboard(closeRoom: true);
           }
         },
         onAdFailedToShowFullScreenContent: (failedAd, error) {
-          print('❌ Ad failed to show: $error');
+          
           failedAd.dispose();
           if (mounted) {
             _toggleLeaderboard(closeRoom: true);
@@ -2619,14 +2441,14 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         },
       );
 
-      print('🎬 Showing close ad...');
+      
       await ad.show(
         onUserEarnedReward: (ad, reward) {
-          print('✅ User earned reward from close ad');
+          
         },
       );
     } catch (e) {
-      print('❌ Error showing close ad: $e');
+      
       _toggleLeaderboard(closeRoom: true);
     }
   }
@@ -2771,7 +2593,35 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     _socketService.removeAllListeners();
     // _voiceService.cleanUp();
     _closeRewardedAd?.dispose();
+    _strokes.dispose();
+    _currentStroke.dispose();
+    _showGrid.dispose();
+    _backgroundImage.dispose();
+    _polygonSides.dispose();
     super.dispose();
+  }
+
+  fdb_tool.DrawingTool _getFdbDrawingTool(DrawingTool tool) {
+    switch (tool) {
+      case DrawingTool.pencil:
+      case DrawingTool.colorPicker:
+        return fdb_tool.DrawingTool.pencil;
+      case DrawingTool.eraser:
+        return fdb_tool.DrawingTool.eraser;
+      case DrawingTool.circle:
+      case DrawingTool.filledCircle:
+        return fdb_tool.DrawingTool.circle;
+      case DrawingTool.rectangle:
+      case DrawingTool.filledRectangle:
+        return fdb_tool.DrawingTool.square;
+      default:
+        return fdb_tool.DrawingTool.pencil;
+    }
+  }
+
+  bool _isFilled(DrawingTool tool) {
+    return tool == DrawingTool.filledCircle ||
+        tool == DrawingTool.filledRectangle;
   }
 
   @override
@@ -2857,7 +2707,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     final double screenH = MediaQuery.of(context).size.height * 0.48;
     final double boardHeight =
         isKeyboardVisible ? 200.r : screenH.clamp(300.r, 520.r);
-
+    
     return Scaffold(
       key: _gameScreenKey,
       resizeToAvoidBottomInset: false,
@@ -2885,7 +2735,8 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             ),
             // _buildSpeakerOverlay(),
             // if (_shouldShowNextDrawerOverlay) _buildNextDrawerOverlay(),
-            if (_isLeaderboardVisible && !_shouldShowNextDrawerOverlay)
+            if (_isLeaderboardVisible &&
+                !_shouldShowNextDrawerOverlay )
               _buildLeaderboardOverlay(),
           ],
         ),
@@ -2931,7 +2782,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
 
     final String expandedKeyString =
         'expanded_${_currentPhase ?? 'unknown'}_${_isDrawer ? 'drawer' : 'guesser'}';
-
+    
     return Scaffold(
       backgroundColor: Colors.black,
       body: SafeArea(
@@ -2977,12 +2828,35 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                             child: Stack(
                               children: [
                                 DrawingCanvas(
-                                  key: ValueKey(expandedKeyString),
-                                  points: _drawingPoints,
-                                  onPointAdded: _onDrawingPointAdded,
-                                  selectedColor: _selectedColor,
-                                  strokeWidth: _strokeWidth,
-                                  isDrawingEnabled: true,
+                                  canvasKey: _canvasKey,
+                                  strokesListenable: _strokes,
+                                  currentStrokeListenable: _currentStroke,
+                                  options: fdb.DrawingCanvasOptions(
+                                    currentTool:
+                                        _currentTool == DrawingTool.eraser
+                                            ? fdb_tool.DrawingTool.pencil
+                                            : _getFdbDrawingTool(_currentTool),
+                                    strokeColor:
+                                        _currentTool == DrawingTool.eraser
+                                            ? Colors.black
+                                            : _selectedColor,
+                                    size: _strokeWidth,
+                                    opacity: _currentTool == DrawingTool.eraser
+                                        ? 1.0
+                                        : _selectedColor.opacity,
+                                    backgroundColor: Colors.black,
+                                    showGrid: _showGrid.value,
+                                    fillShape: _isFilled(_currentTool),
+                                    polygonSides: _polygonSides.value,
+                                  ),
+                                  onDrawingStrokeChanged: (stroke) {
+                                    if (stroke == null &&
+                                        _strokes.value.isNotEmpty) {
+                                      _socketService.sendDrawing(widget.roomId,
+                                          _strokes.value.last.toJson());
+                                    }
+                                  },
+                                  backgroundImageListenable: _backgroundImage,
                                 ),
                                 // The Word/Hint display is correctly positioned over the Canvas
                                 Positioned(
@@ -3005,7 +2879,8 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             // --- Overlays (Positioned within the main Stack) ---
             // _buildSpeakerOverlay(),
 
-            if (_isLeaderboardVisible && !_shouldShowNextDrawerOverlay)
+            if (_isLeaderboardVisible &&
+                !_shouldShowNextDrawerOverlay )
               _buildLeaderboardOverlay(),
 
             _buildOptionIcon(),
@@ -3097,7 +2972,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     final String message = isCorrect ? '$userName hit!' : '$userName: $guess';
 
     final overlay = Overlay.of(context);
-    if (overlay == null) return;
 
     // Create an OverlayEntry
     late OverlayEntry entry;
@@ -3118,7 +2992,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                   padding:
                       EdgeInsets.symmetric(vertical: 8.h, horizontal: 12.w),
                   decoration: BoxDecoration(
-                    color: Color.fromRGBO(30, 30, 30, 1),
+                    color: const Color.fromRGBO(30, 30, 30, 1),
                     borderRadius: BorderRadius.circular(16.r),
                     boxShadow: const [
                       BoxShadow(
@@ -3133,7 +3007,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     children: [
                       Icon(
                         isCorrect ? Icons.check_circle : Icons.close,
-                        color: Colors.green,
+                        color: isCorrect ? Colors.green : Colors.red,
                         size: 14.sp,
                       ),
                       SizedBox(width: 6.w),
@@ -3174,7 +3048,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     final String message = "Remaining hints: $hints";
 
     final overlay = Overlay.of(context);
-    if (overlay == null) return;
 
     // Create an OverlayEntry
     late OverlayEntry entry;
@@ -3195,7 +3068,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                   padding:
                       EdgeInsets.symmetric(vertical: 8.h, horizontal: 12.w),
                   decoration: BoxDecoration(
-                    color: Color.fromRGBO(30, 30, 30, 1),
+                    color: const Color.fromRGBO(30, 30, 30, 1),
                     borderRadius: BorderRadius.circular(16.r),
                     boxShadow: const [
                       BoxShadow(
@@ -3256,14 +3129,14 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         blueScore += participant.score ?? 0;
       }
     }
-    final int teamScore = 75; // Example score
-    final int targetScore = 100; // Example target
-    final String teamLabel = 'B';
-    final Color teamColor = Colors.orange;
+    const int teamScore = 75; // Example score
+    const int targetScore = 100; // Example target
+    const String teamLabel = 'B';
+    const Color teamColor = Colors.orange;
 
-    Widget _buildTeamScorePill({required double maxWidth}) {
+    Widget buildTeamScorePill({required double maxWidth}) {
       // 1. Calculate the progress ratio (a value between 0.0 and 1.0)
-      final double progressRatio =
+      const double progressRatio =
           targetScore > 0 ? teamScore / targetScore : 0.0;
       // Ensure the width is at least enough to fully contain the badge if score > 0
       final double badgeWidth = 30.w; // Must match the size in teamBadge
@@ -3530,49 +3403,75 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       return const SizedBox.shrink();
     }
 
-    // Define styling properties
-    final double letterSize = 24.sp;
-    final double letterSpacing = 12.w; // Space between letters/containers
-    final Color letterColor = Colors.white;
-    final Color borderColor = Colors.grey;
-    final double borderWidth = 1.0;
+    // Base styling (will be scaled down if necessary)
+    final double baseBoxWidth = 24.sp; // base container width
+    final double baseSpacing = 12.w; // base space between boxes
+    final double baseFontSize = 20.sp; // base font size
+    const Color letterColor = Colors.white;
+    const Color borderColor = Colors.grey;
+    const double borderWidth = 1.0;
 
-    // Split the word into individual characters
     final List<String> characters = word.characters.toList();
+    final int n = characters.length;
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min, // Keep row size tight to content
-      children: characters.map((char) {
-        // 1. Create the container for the letter/line
-        final Widget letterBox = Container(
-          width: letterSize, // Fixed width for the box
+    // Use LayoutBuilder to know how much horizontal space we actually have
+    return LayoutBuilder(builder: (context, constraints) {
+      // Determine available width: if unconstrained, use screen width as fallback
+      final double maxAvailableWidth = (constraints.maxWidth.isFinite)
+          ? constraints.maxWidth
+          : MediaQuery.of(context).size.width;
+
+      // Calculate required width with base sizes
+      final double requiredWidth =
+          n * baseBoxWidth + (n - 1) * baseSpacing; // total space needed
+
+      // If required width exceeds available width, compute a scale factor
+      double scale = 1.0;
+      if (requiredWidth > maxAvailableWidth && requiredWidth > 0) {
+        scale = maxAvailableWidth / requiredWidth;
+      }
+
+      // Clamp scale so we don't shrink to unreadable sizes
+      const double minScale =
+          0.45; // tweakable minimum (makes letters still readable)
+      scale = scale.clamp(minScale, 1.0);
+
+      // Scaled sizes
+      final double boxWidth = baseBoxWidth * scale;
+      final double spacing = baseSpacing * scale;
+      final double fontSize = baseFontSize * scale;
+
+      // Build letter widgets using scaled sizes
+      final letterBoxes = characters.map((char) {
+        return Container(
+          width: boxWidth,
           alignment: Alignment.center,
-          margin:
-              EdgeInsets.only(right: letterSpacing), // Space to the next letter
-          padding: EdgeInsets.only(bottom: 2.h),
-          decoration: BoxDecoration(
+          margin: EdgeInsets.only(right: spacing),
+          padding: EdgeInsets.only(bottom: 2.h * scale),
+          decoration: const BoxDecoration(
             border: Border(
-              bottom: BorderSide(
-                color: borderColor,
-                width: borderWidth,
-              ),
+              bottom: BorderSide(color: borderColor, width: borderWidth),
             ),
           ),
           child: Text(
             char.toUpperCase(),
             style: TextStyle(
               color: letterColor,
-              fontSize: 20.sp,
+              fontSize: fontSize,
               fontWeight: FontWeight.bold,
-              // DO NOT use letterSpacing here, the container margin handles it
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         );
+      }).toList();
 
-        return letterBox;
-      }).toList(),
-    );
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: letterBoxes,
+      );
+    });
   }
 
   Widget _buildLostTurnWidget() {
@@ -3599,12 +3498,12 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             children: [
               CircleAvatar(
                 radius: 24.r,
-                backgroundImage: AssetImage(AppImages.profileSelect),
+                backgroundImage: const AssetImage(AppImages.profileSelect),
                 backgroundColor: Colors.transparent,
               ),
               SizedBox(width: 12.w),
               Text(
-                "${missedTheirTurn} ${AppLocalizations.missedTheirTurn}",
+                "$missedTheirTurn ${AppLocalizations.missedTheirTurn}",
                 style: GoogleFonts.lato(
                   color: Colors.cyan,
                   fontSize: 12.sp,
@@ -3811,6 +3710,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
 
     return BlueBackgroundScaffold(
       child: SafeArea(
+        bottom: false,
         child: Column(
           children: [
             Expanded(
@@ -4236,7 +4136,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                   ),
                 ),
               ),
-            SizedBox(height: 10.h),
           ],
         ),
       ),
@@ -4333,10 +4232,13 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       GestureDetector(
-                        onTap: isOwner && players > 2
+                        onTap: isOwner &&
+                                players > _participants.length &&
+                                players > 2
                             ? () {
                                 setState(() {
-                                  players = (players - 1).clamp(2, 15);
+                                  players = (players - 1)
+                                      .clamp(_participants.length, 15);
                                   maxPlayers = players;
                                 });
                                 _updateSettings();
@@ -4351,7 +4253,12 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                   topLeft: Radius.circular(20.h),
                                   bottomLeft: Radius.circular(20.h))),
                           child: Icon(Icons.remove,
-                              size: 16.sp, color: Colors.white),
+                              size: 16.sp,
+                              color: (isOwner &&
+                                      players > _participants.length &&
+                                      players > 2)
+                                  ? Colors.white
+                                  : Colors.white30),
                         ),
                       ),
                       SizedBox(
@@ -4942,12 +4849,15 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       'maxPlayers': maxPlayers,
     };
 
+    
     _socketService.updateSettings(widget.roomId, settings);
   }
 
   void _selectTeam(String team, {bool explicitlyUpdate = false}) {
     if (!explicitlyUpdate && selectedTeam != null) return;
     if (selectedGameMode != 'team_vs_team') return;
+    if (team == 'A') team = 'blue';
+    if (team == 'B') team = 'orange';
     if (team == 'orange') {
       if (selectedTeam == 'orange') {
         team = 'blue';
@@ -5015,7 +4925,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         allParticipants.where((p) => p['isSpeaking'] == false).toList();
 
     // Show speakers first, then non-speakers (limit total to prevent overflow)
-    final maxVisible = 8; // Maximum avatars to show at once
+    const maxVisible = 8; // Maximum avatars to show at once
     final displayList = <Map<String, dynamic>>[];
 
     // Add all speakers first
@@ -5102,12 +5012,12 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                   ),
                 ),
               ),
-              SizedBox(
+              const SizedBox(
                 width: 3,
               ),
               Text(
                 name,
-                style: TextStyle(color: Colors.white),
+                style: const TextStyle(color: Colors.white),
               )
             ],
           );
@@ -5397,9 +5307,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     ? (v) async {
                         setState(() => selectedGameMode = v);
                         _updateSettings();
-                        print(selectedGameMode);
+                        
                         if (selectedGameMode == 'team_vs_team') {
-                          await Future.delayed(Duration(milliseconds: 100));
+                          await Future.delayed(const Duration(milliseconds: 100));
                           selectedTeam = 'blue';
                           _selectTeam('blue', explicitlyUpdate: true);
                         }
@@ -5519,7 +5429,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       GestureDetector(
-                        onTap: isOwner && maxPlayers > 2
+                        onTap: isOwner &&
+                                maxPlayers > _participants.length &&
+                                maxPlayers > 2
                             ? () {
                                 setState(() => maxPlayers -= 1);
                                 _updateSettings();
@@ -5529,7 +5441,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                           padding: EdgeInsets.all(1.w),
                           child: Icon(Icons.remove,
                               size: 14.sp,
-                              color: (isOwner && maxPlayers > 2)
+                              color: (isOwner &&
+                                      maxPlayers > _participants.length &&
+                                      maxPlayers > 2)
                                   ? Colors.white
                                   : Colors.white30),
                         ),
@@ -5668,7 +5582,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         innerCircleRadius: 3);
 
     // This one is already updated:
-    final SliderComponentShape largeHollowRing = RoundSliderWithBorderThumb(
+    const SliderComponentShape largeHollowRing = RoundSliderWithBorderThumb(
         thumbRadius: 5.0,
         borderWidth: 2.0,
         outerColor: Colors.white,
@@ -5679,7 +5593,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         internalBorderWidth: 4); // Corrected to 1.0 (double)
 
     // FIX: This shape was missing the parameter.
-    final SliderComponentShape smallHollowRing = RoundSliderWithBorderThumb(
+    const SliderComponentShape smallHollowRing = RoundSliderWithBorderThumb(
       thumbRadius: 5.0,
       borderWidth: 2.0,
       outerColor: Colors.white,
@@ -5691,7 +5605,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     );
 
     // FIX: This shape was missing the parameter.
-    final SliderComponentShape centralThumb = RoundSliderWithBorderThumb(
+    const SliderComponentShape centralThumb = RoundSliderWithBorderThumb(
       thumbRadius: 5.0,
       internalBorderColor: Colors.white,
       innerCircleRadius: 1.5,
@@ -5729,7 +5643,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     // 1. Thickness Slider
                     Container(
                       color: containerBackground,
-                      margin: EdgeInsets.all(5),
+                      margin: const EdgeInsets.all(5),
                       child: Padding(
                         padding: EdgeInsets.symmetric(vertical: 8.h),
                         child: SliderTheme(
@@ -5763,7 +5677,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     // 2. Opacity/Alpha Slider
                     Container(
                       color: containerBackground,
-                      margin: EdgeInsets.all(5),
+                      margin: const EdgeInsets.all(5),
                       child: Padding(
                         padding: EdgeInsets.symmetric(vertical: 8.h),
                         child: SliderTheme(
@@ -6161,10 +6075,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       _waitingForPlayers = true;
 
       // Clear drawing data
-      _drawingPoints = [];
-      _drawingHistory = [];
-      _historyIndex = -1;
-      _shapeStartPoint = null;
+      _strokes.value = [];
+      _currentStroke.clear();
+      _undoRedoStack.clear();
 
       // Clear chat messages
       _chatMessages.clear();
@@ -6206,7 +6119,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     // Refresh user data to get updated coin balance
     await _refreshUserData();
 
-    print('✅ Game state reset - ready for new game');
+    
   }
 
   Future<void> _refreshUserData() async {
@@ -6214,19 +6127,19 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       final result = await _userRepository.getMe();
       result.fold(
         (failure) {
-          print('❌ Failed to refresh user data: ${failure.message}');
+          
         },
         (user) {
           if (mounted) {
             setState(() {
               _currentUser = user;
             });
-            print('✅ User data refreshed - Coins: ${user.coins}');
+            
           }
         },
       );
     } catch (e) {
-      print('❌ Error refreshing user data: $e');
+      
     }
   }
 
@@ -6241,7 +6154,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     if (_participants.isEmpty) {
       return;
     }
-
+  
     final bool canShow = !_waitingForPlayers && (_room?.status == 'playing');
 
     if (!canShow) {
@@ -6258,6 +6171,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         _isLeaderboardVisible = !_isLeaderboardVisible;
       });
     }
+    print('Toggling leaderboard visibility. Current state: $_isLeaderboardVisible');
   }
 
   _DrawerMessageOption? _findDrawerMessageOption(String? key) {
@@ -6411,17 +6325,24 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   void _showTeamPlayers(String teamKey, String teamDisplayLabel) {
-    final teamPlayers = _participants
-        .where((participant) => participant.team == teamKey)
+    
+    final teamPlayers = _participants.where((participant) {
+      
+      return participant.team == teamKey;
+    }).toList();
+    teamPlayers.sort((a, b) => (b.score ?? 0).compareTo(a.score ?? 0));
+    
+    final teamPlayersList = teamPlayers
         .map((participant) => TeamPlayer(
-              rank: 1,
+              rank: teamPlayers.indexOf(participant) + 1,
               name: participant.user?.name ?? 'Player',
               avatarPath: participant.user?.avatar ?? AppImages.profile,
               flagEmoji: '🇮🇳',
             ))
         .toList();
+    
 
-    if (teamPlayers.isEmpty) {
+    if (teamPlayersList.isEmpty) {
       return;
     }
 
@@ -6430,7 +6351,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       barrierColor: Colors.black54,
       builder: (context) => TeamDisplayPopup(
         teamName: teamDisplayLabel,
-        players: teamPlayers,
+        players: teamPlayersList,
       ),
     );
   }
@@ -6646,7 +6567,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             mainAxisAlignment: MainAxisAlignment.start,
             // crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
+              SizedBox(
                 height: iconHeight,
                 width: iconWidth,
                 child: Image.asset(
@@ -6680,7 +6601,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             mainAxisAlignment: MainAxisAlignment.start,
             // crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
+              SizedBox(
                 height: iconHeight,
                 width: iconWidth,
                 child: Image.asset(
@@ -6748,7 +6669,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             mainAxisAlignment: MainAxisAlignment.start,
             // crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
+              SizedBox(
                 height: iconHeight,
                 width: iconWidth,
                 child: Image.asset(
@@ -6779,7 +6700,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
               // height: menuHeight,
               // width: menuWidth,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                     begin: AlignmentGeometry.topCenter,
                     end: AlignmentGeometry.bottomCenter,
                     colors: [
@@ -6857,7 +6778,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     final List<RoomParticipant> remaining = sortedParticipants.length > 3
         ? sortedParticipants.sublist(3)
         : <RoomParticipant>[];
-    print("RoomParticipant list $remaining");
+    
 
     final Size size = MediaQuery.of(context).size;
     final double panelWidth = math.min(size.width * 0.88, 360.w);
@@ -6903,7 +6824,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Transform.scale(
-                            scale: 1.8,
+                            scale: 3.5,
                             child: Image.asset(
                               AppImages.leaderboardBanner,
                               height: 46.h,
@@ -7243,7 +7164,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Image.asset(
                   AppImages.flag,
                   width: 24.w,
@@ -7267,7 +7188,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                 width: 24.w,
                 height: 16.h,
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 '$score',
                 style: GoogleFonts.lato(
@@ -7279,7 +7200,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             ],
           ),
 
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
         ],
       ),
     );
@@ -7310,7 +7231,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         shape: BoxShape.circle,
 
         color: Colors.black,
@@ -7371,25 +7292,25 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     TooltipActionButton(
                       name: 'skip',
                       backgroundColor: Colors.white,
-                      textStyle: TextStyle(color: Colors.grey),
+                      textStyle: const TextStyle(color: Colors.grey),
                       type: TooltipDefaultActionType.skip,
                       onTap: () => ShowcaseView.get().dismiss(),
                     ),
                     TooltipActionButton(
                       name: 'Next',
-                      tailIcon: ActionButtonIcon(
+                      tailIcon: const ActionButtonIcon(
                         icon: Icon(Icons.arrow_forward_ios, size: 12),
                       ),
                       type: TooltipDefaultActionType.next,
                       backgroundColor: Colors.white,
-                      textStyle: TextStyle(color: Colors.black),
+                      textStyle: const TextStyle(color: Colors.black),
                       onTap: () => ShowcaseView.get().next(),
                     ),
                   ],
                   overlayColor: const Color.fromRGBO(116, 116, 116, 0.63),
                   showArrow: false,
                   toolTipMargin: 21,
-                  tooltipPadding: EdgeInsets.all(12),
+                  tooltipPadding: const EdgeInsets.all(12),
                   description: "Click to View room name and teams",
                   key: showcasekey2,
                   child: _copyableRoomIdPill(roomId)),
@@ -7421,18 +7342,18 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                           TooltipActionButton(
                             name: 'skip',
                             backgroundColor: Colors.white,
-                            textStyle: TextStyle(color: Colors.grey),
+                            textStyle: const TextStyle(color: Colors.grey),
                             type: TooltipDefaultActionType.skip,
                             onTap: () => ShowcaseView.get().dismiss(),
                           ),
                           TooltipActionButton(
                             name: 'Next',
-                            tailIcon: ActionButtonIcon(
+                            tailIcon: const ActionButtonIcon(
                               icon: Icon(Icons.arrow_forward_ios, size: 12),
                             ),
                             type: TooltipDefaultActionType.next,
                             backgroundColor: Colors.white,
-                            textStyle: TextStyle(color: Colors.black),
+                            textStyle: const TextStyle(color: Colors.black),
                             onTap: () => ShowcaseView.get().next(),
                           ),
                         ],
@@ -7440,7 +7361,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                         overlayColor: const Color.fromRGBO(116, 116, 116, 0.63),
                         showArrow: false,
                         toolTipMargin: 21,
-                        tooltipPadding: EdgeInsets.all(12),
+                        tooltipPadding: const EdgeInsets.all(12),
                         key: showcasekey1,
                         description: "Click to View top players and scores",
 
@@ -7453,6 +7374,8 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             SizedBox(width: 5.w),
             GestureDetector(
               onTap: () {
+                 _toggleLeaderboard();
+                 return;
                 List<Team> teams = [];
                 if (isTeamMode) {
                   int orangeScore = 0;
@@ -7462,14 +7385,16 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                   for (var participant in _participants) {
                     if (participant.team == 'orange') {
                       orangeScore += participant.score ?? 0;
-                      if (avatarTeamB != null)
+                      if (avatarTeamB != null) {
                         avatarTeamB = participant.user?.avatar ??
                             participant.user?.profilePicture;
+                      }
                     } else if (participant.team == 'blue') {
                       blueScore += participant.score ?? 0;
-                      if (avatarTeamA != null)
+                      if (avatarTeamA != null) {
                         avatarTeamA = participant.user?.avatar ??
                             participant.user?.profilePicture;
+                      }
                     }
                   }
                   teams = [
@@ -7485,7 +7410,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     ),
                   ];
                 } else {
-                  _participants.sort((a, b) => b!.score!.compareTo(a!.score!));
+                  _participants.sort((a, b) => b.score!.compareTo(a.score!));
                   var topPlayers = _participants.take(3).toList();
                   teams = topPlayers.map((player) {
                     return Team(
@@ -7526,25 +7451,25 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                   TooltipActionButton(
                     name: 'skip',
                     backgroundColor: Colors.white,
-                    textStyle: TextStyle(color: Colors.grey),
+                    textStyle: const TextStyle(color: Colors.grey),
                     type: TooltipDefaultActionType.skip,
                     onTap: () => ShowcaseView.get().dismiss(),
                   ),
                   TooltipActionButton(
                     name: 'Next',
-                    tailIcon: ActionButtonIcon(
+                    tailIcon: const ActionButtonIcon(
                       icon: Icon(Icons.arrow_forward_ios, size: 12),
                     ),
                     type: TooltipDefaultActionType.next,
                     backgroundColor: Colors.white,
-                    textStyle: TextStyle(color: Colors.black),
+                    textStyle: const TextStyle(color: Colors.black),
                     onTap: () => ShowcaseView.get().next(),
                   ),
                 ],
                 overlayColor: const Color.fromRGBO(116, 116, 116, 0.63),
                 showArrow: false,
                 toolTipMargin: 21,
-                tooltipPadding: EdgeInsets.all(12),
+                tooltipPadding: const EdgeInsets.all(12),
                 description: "Click to see the room status",
                 key: showcasekey3,
                 child: _pill(
@@ -8119,6 +8044,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   List<Widget> _buildModalOverlays() {
+    debugPrint("CURRENT PHASE : $_currentPhase");
     // 1. HIGHEST PRIORITY: Word Selection Dialog (Blocks all others)
     if (_isWordSelectionDialogVisible) {
       return [_showWordSelectionDialog()];
@@ -8147,7 +8073,8 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             (_currentDrawerInfo?['team'] != _currentParticipant?.team)) ||
         (_currentPhase == 'interval');
 
-    if (isScoreboardPhase) {
+    if (isScoreboardPhase ||
+        (_currentPhase == "selecting_drawer" && !_isDrawer)) {
       // Assuming interval widget exists and handles team score/interval screens
       return [
         _buildIntervalWidget(),
@@ -8162,7 +8089,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     }
 
     // Fallback: If the outer condition was true but none of the inner conditions are met.
-    return const [SizedBox.shrink()];
+    return [_buildIntervalWidget()];
   }
 
   Widget _buildBoardArea(double height) {
@@ -8184,118 +8111,8 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             _phaseMaxTime > 0
         ? remainingSeconds / _phaseMaxTime
         : 0.0;
+    
     final bool isCritical = isDrawingPhase && remainingSeconds < 20;
-
-    final Widget board = Container(
-      height: height,
-      decoration: BoxDecoration(
-        color: const Color(0xFF111111),
-        borderRadius: BorderRadius.circular(10.r),
-        border: universalBorder,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10.r),
-        child: (_isWordSelectionDialogVisible ||
-                _shouldShowNextDrawerOverlay ||
-                _isWordSelectionLostTurn ||
-                (_isTeamGamePlaying &&
-                        (_currentDrawerInfo?['team'] !=
-                            _currentParticipant?.team) ||
-                    (_currentPhase == 'interval')) ||
-                (_currentWord != null) ||
-                (_currentPhase == 'selecting_drawer'))
-            ? Stack(children: [
-                Column(children: _buildModalOverlays()),
-                if (_showSlider)
-                  Positioned(
-                    top: height - 50.h,
-                    left: 15.w,
-                    child: Container(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 1.w, vertical: 1.h),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1A1A1A),
-                        borderRadius: BorderRadius.circular(20.r),
-                      ),
-                      child: SizedBox(
-                        width: 120.w,
-                        child: Slider(
-                          value: _volume,
-                          min: 0.0,
-                          max: 1.0,
-                          activeColor: const Color.fromARGB(255, 160, 163, 165),
-                          inactiveColor: Colors.grey[600],
-                          onChanged: _updateVolumeIcon,
-                        ),
-                      ),
-                    ),
-                  ),
-              ])
-            : Stack(
-                children: [
-                  Positioned.fill(
-                    child: Container(
-                      color: const Color(0xFF111111),
-                      child: _waitingForPlayers || _room?.status != 'playing'
-                          ? _waitingForPlayersView(players)
-                          : _buildDrawingBoard(),
-                    ),
-                  ),
-                  if (_showSlider)
-                    Positioned(
-                      top: height - 50.h,
-                      left: 15.w,
-                      child: Container(
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 1.w, vertical: 1.h),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1A1A1A),
-                          borderRadius: BorderRadius.circular(20.r),
-                        ),
-                        child: SizedBox(
-                          width: 120.w,
-                          child: Slider(
-                            value: _volume,
-                            min: 0.0,
-                            max: 1.0,
-                            activeColor:
-                                const Color.fromARGB(255, 160, 163, 165),
-                            inactiveColor: Colors.grey[600],
-                            onChanged: _updateVolumeIcon,
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (_isDrawer &&
-                      !_waitingForPlayers &&
-                      _room?.status == 'playing')
-                    Positioned(
-                      top: 10.h,
-                      left: 10.w,
-                      child: _buildDrawingTools(),
-                    ),
-                  if (!_waitingForPlayers &&
-                      _room?.status == 'playing' &&
-                      _currentPhase == 'drawing')
-                    Positioned(
-                      top: 10.h,
-                      left: 0,
-                      right: 0,
-                      child: Center(child: _buildHintSystem()),
-                    ),
-                  if (_isDrawer &&
-                      !_waitingForPlayers &&
-                      _room?.status == 'playing' &&
-                      _currentPhase == 'drawing')
-                    Positioned(
-                      bottom: 16.h,
-                      right: 16.w,
-                      child: _buildHintButton(),
-                    ),
-                ],
-              ),
-      ),
-    );
 
     // NEW CODE BLOCK (REPLACEMENT)
     Color indicatorColor;
@@ -8328,22 +8145,139 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       }
     });
 
-    return AnimatedBuilder(
-      animation: _progressAnimation,
-      builder: (context, child) {
-        return CustomPaint(
-          foregroundPainter: _progressAnimation.value > 0 &&
-                  indicatorColor != Colors.transparent
-              ? _PhaseBorderPainter(
-                  progress: _progressAnimation.value.clamp(0.0, 1.0),
-                  color: indicatorColor,
-                  strokeWidth: 4.w,
-                  borderRadius: 10.r,
-                )
-              : null,
-          child: board,
-        );
-      },
+    final Widget boardContent = ClipRRect(
+      borderRadius: BorderRadius.circular(10.r),
+      child: (_isWordSelectionDialogVisible ||
+                  _shouldShowNextDrawerOverlay ||
+                  _isWordSelectionLostTurn ||
+                  (_isTeamGamePlaying &&
+                          (_currentDrawerInfo?['team'] !=
+                              _currentParticipant?.team) ||
+                      (_currentPhase == 'interval')) ||
+                  (_currentWord != null) ||
+                  (_currentPhase == 'selecting_drawer') ||
+                  (_currentPhase == 'choosing_word')) &&
+              (_currentPhase != 'drawing')
+          ? Stack(
+              children: [
+                Column(children: _buildModalOverlays()),
+                if (_showSlider)
+                  Positioned(
+                    top: height - 50.h,
+                    left: 15.w,
+                    child: Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 1.w, vertical: 1.h),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A1A),
+                        borderRadius: BorderRadius.circular(20.r),
+                      ),
+                      child: SizedBox(
+                        width: 120.w,
+                        child: Slider(
+                          value: _volume,
+                          min: 0.0,
+                          max: 1.0,
+                          activeColor: const Color.fromARGB(255, 160, 163, 165),
+                          inactiveColor: Colors.grey[600],
+                          onChanged: _updateVolumeIcon,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            )
+          : Stack(
+              children: [
+                Positioned.fill(
+                  child: Container(
+                    color: const Color(0xFF111111),
+                    child: _waitingForPlayers || _room?.status != 'playing'
+                        ? _waitingForPlayersView(players)
+                        : _buildDrawingBoard(),
+                  ),
+                ),
+                if (_showSlider)
+                  Positioned(
+                    top: height - 50.h,
+                    left: 15.w,
+                    child: Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 1.w, vertical: 1.h),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1A1A),
+                        borderRadius: BorderRadius.circular(20.r),
+                      ),
+                      child: SizedBox(
+                        width: 120.w,
+                        child: Slider(
+                          value: _volume,
+                          min: 0.0,
+                          max: 1.0,
+                          activeColor: const Color.fromARGB(255, 160, 163, 165),
+                          inactiveColor: Colors.grey[600],
+                          onChanged: _updateVolumeIcon,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_isDrawer &&
+                    !_waitingForPlayers &&
+                    _room?.status == 'playing')
+                  Positioned(
+                    top: 10.h,
+                    left: 10.w,
+                    child: _buildDrawingTools(),
+                  ),
+                if (!_waitingForPlayers &&
+                    _room?.status == 'playing' &&
+                    _currentPhase == 'drawing')
+                  Positioned(
+                    top: 10.h,
+                    left: 0,
+                    right: 0,
+                    child: Center(child: _buildHintSystem()),
+                  ),
+                if (_isDrawer &&
+                    !_waitingForPlayers &&
+                    _room?.status == 'playing' &&
+                    _currentPhase == 'drawing')
+                  Positioned(
+                    bottom: 16.h,
+                    right: 16.w,
+                    child: _buildHintButton(),
+                  ),
+              ],
+            ),
+    );
+
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(10.r),
+        border: universalBorder,
+      ),
+      child: AnimatedBuilder(
+        animation: _progressAnimation,
+        builder: (context, child) {
+          
+          
+          return CustomPaint(
+            foregroundPainter: _progressAnimation.value > 0 &&
+                    indicatorColor != Colors.transparent
+                ? _PhaseBorderPainter(
+                    progress: _progressAnimation.value.clamp(0.0, 1.0),
+                    color: indicatorColor,
+                    strokeWidth: 4.w,
+                    borderRadius: 10.r,
+                  )
+                : null,
+            child: child,
+          );
+        },
+        child: boardContent,
+      ),
     );
   }
 
@@ -8373,49 +8307,27 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   // Modify _buildDrawingBoard() to use LayoutBuilder to capture size immediately
 
   Widget _buildDrawingBoard() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final Size calculatedSize =
-            Size(constraints.maxWidth, constraints.maxHeight);
-
-        // Update the appropriate board size based on current role
-        if (calculatedSize != Size.zero) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              setState(() {
-                if (_isDrawer) {
-                  if (calculatedSize != _drawerBoardSize) {
-                    _drawerBoardSize = calculatedSize;
-                    print('✅ Drawer board size updated: $_drawerBoardSize');
-                  }
-                } else {
-                  if (calculatedSize != _guesserBoardSize) {
-                    _guesserBoardSize = calculatedSize;
-                    print('✅ Guesser board size updated: $_guesserBoardSize');
-                  }
-                }
-                _lastKnownBoardSize = calculatedSize;
-              });
-            }
-          });
-        }
-
-        final String keyString =
-            '${_currentPhase ?? 'unknown'}_${_isDrawer ? 'drawer' : 'guesser'}';
-
-        // FIX: Use the correct layout key based on role
-        return Container(
-          key: _isDrawer ? _drawerBoardLayoutKey : _guesserBoardLayoutKey,
-          child: DrawingCanvas(
-            key: ValueKey(keyString),
-            points: _drawingPoints,
-            onPointAdded: _onDrawingPointAdded,
-            selectedColor: _selectedColor,
-            strokeWidth: _strokeWidth,
-            isDrawingEnabled: _isDrawer,
+    // FIX: Use the correct layout key based on role
+    return Container(
+      key: _isDrawer ? _drawerBoardLayoutKey : _guesserBoardLayoutKey,
+      child: IgnorePointer(
+        ignoring: true,
+        child: DrawingCanvas(
+          canvasKey:
+              GlobalKey(), // Use a different key or same if needed, but guesser doesn't need to repaint boundary for export usually
+          strokesListenable: _strokes,
+          currentStrokeListenable: _currentStroke,
+          options: fdb.DrawingCanvasOptions(
+            currentTool: fdb_tool.DrawingTool.pencil, // Default for display
+            strokeColor: Colors.black,
+            size: 1.0,
+            backgroundColor: Colors.black,
+            showGrid: _showGrid.value,
           ),
-        );
-      },
+          onDrawingStrokeChanged: null,
+          backgroundImageListenable: _backgroundImage,
+        ),
+      ),
     );
   }
 
@@ -8456,7 +8368,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       height: 50.h,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Color.fromRGBO(29, 34, 34, 1),
+        color: const Color.fromRGBO(29, 34, 34, 1),
         borderRadius: BorderRadius.circular(8),
         boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 4)],
       ),
@@ -8786,13 +8698,13 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                                   color: Colors.white, width: 1)
                                               : null,
                                         ),
-                                        margin: EdgeInsets.fromLTRB(1, 1, 1, 1),
+                                        margin: const EdgeInsets.fromLTRB(1, 1, 1, 1),
                                         height: 15,
                                         width: 15,
                                       ),
                                     ),
                                   )
-                                  .toList(),
+                                  ,
                             ],
                           ),
                           Row(
@@ -8816,13 +8728,13 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                           borderRadius:
                                               BorderRadius.circular(2),
                                         ),
-                                        margin: EdgeInsets.fromLTRB(1, 1, 1, 1),
+                                        margin: const EdgeInsets.fromLTRB(1, 1, 1, 1),
                                         height: 15,
                                         width: 15,
                                       ),
                                     ),
                                   )
-                                  .toList(),
+                                  ,
                             ],
                           )
                         ],
@@ -8913,8 +8825,8 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   //   );
   // }
   OverlayEntry _buildComplimentWidget() {
-    print("COmplimnet Widget");
-    Widget _buildGuessCompliment() {
+    
+    Widget buildGuessCompliment() {
       final guessed = _usersWhoAnswered.length;
       final total = _participants.length - 1;
 
@@ -8960,7 +8872,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                   color: Colors.black87,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: _buildGuessCompliment(),
+                child: buildGuessCompliment(),
               ),
             ),
           ),
@@ -8971,7 +8883,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
 
   OverlayEntry _buildDrawerScoreWidget() {
     Color textColor = Colors.green;
-    Widget _buildGuessCompliment() {
+    Widget buildGuessCompliment() {
       final guessed = _usersWhoAnswered.length;
 
       final total = _participants.length - 1;
@@ -8986,7 +8898,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         return const Text("🎉 Well Done!!!",
             style: TextStyle(color: Colors.white, fontSize: 20));
       } else if (guessed > (total * 0.5)) {
-        color = Color.fromRGBO(142, 152, 255, 1);
+        color = const Color.fromRGBO(142, 152, 255, 1);
         // Check 50% threshold next
         return const Text("👏 Good Job!",
             style: TextStyle(color: Colors.white, fontSize: 20));
@@ -9003,7 +8915,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       }
     }
 
-    print("Drawer Score Widget");
+    
     return OverlayEntry(
       builder: (context) {
         return Positioned.fill(
@@ -9036,7 +8948,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                             ),
                             SizedBox(height: 14.h),
 
-                            _buildGuessCompliment(),
+                            buildGuessCompliment(),
 
                             SizedBox(height: 14.h),
 
@@ -9078,7 +8990,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   OverlayEntry _buildDrawerTimeUpWidget() {
-    print("Time Up Widget");
+    
     return OverlayEntry(
       builder: (context) {
         return Positioned.fill(
@@ -9147,11 +9059,11 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         SizedBox(height: 10.h),
         Text(
           AppLocalizations.noOneCrackedIt,
-          style: TextStyle(color: Colors.white),
+          style: const TextStyle(color: Colors.white),
         ),
         Text(
           AppLocalizations.letsTryNext,
-          style: TextStyle(color: Colors.white),
+          style: const TextStyle(color: Colors.white),
         )
       ],
     );
@@ -9173,11 +9085,11 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         SizedBox(height: 10.h),
         Text(
           AppLocalizations.fewSharpEyes,
-          style: TextStyle(color: Colors.white),
+          style: const TextStyle(color: Colors.white),
         ),
         Text(
           AppLocalizations.almostThereTeam,
-          style: TextStyle(color: Colors.white),
+          style: const TextStyle(color: Colors.white),
         )
       ],
     );
@@ -9201,7 +9113,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           style: TextStyle(color: Colors.white, fontSize: 22.sp),
         ),
         SizedBox(height: 10.h),
-        Text(
+        const Text(
           "Almost there, team!",
           style: TextStyle(color: Colors.white),
         )
@@ -9220,25 +9132,25 @@ class _GameRoomScreenState extends State<GameRoomScreen>
               TooltipActionButton(
                 name: 'skip',
                 backgroundColor: Colors.white,
-                textStyle: TextStyle(color: Colors.grey),
+                textStyle: const TextStyle(color: Colors.grey),
                 type: TooltipDefaultActionType.skip,
                 onTap: () => ShowcaseView.get().dismiss(),
               ),
               TooltipActionButton(
                 name: 'Next',
-                tailIcon: ActionButtonIcon(
+                tailIcon: const ActionButtonIcon(
                   icon: Icon(Icons.arrow_forward_ios, size: 12),
                 ),
                 type: TooltipDefaultActionType.next,
                 backgroundColor: Colors.white,
-                textStyle: TextStyle(color: Colors.black),
+                textStyle: const TextStyle(color: Colors.black),
                 onTap: () => ShowcaseView.get().next(),
               ),
             ],
             overlayColor: const Color.fromRGBO(116, 116, 116, 0.63),
             showArrow: false,
             toolTipMargin: 21,
-            tooltipPadding: EdgeInsets.all(12),
+            tooltipPadding: const EdgeInsets.all(12),
             description:
                 "Click to View users and scores according to team wise  ",
             key: showcasekey6,
@@ -9289,7 +9201,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     child: Icon(Icons.info_outline,
                         size: 25.w, color: Colors.yellow),
                     onTap: () {
-                      if (showcasecontext != null)
+                      if (showcasecontext != null) {
                         ShowCaseWidget.of(showcasecontext!).startShowCase([
                           showcasekey1,
                           showcasekey2,
@@ -9298,6 +9210,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                           showcasekey5,
                           showcasekey6,
                         ]);
+                      }
                     },
                   ),
                   _buildIconBox(
@@ -9428,161 +9341,16 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     );
   }
 
-  List<DrawingPoint> _generateShapePoints(Offset start, Offset end) {
-    final List<DrawingPoint> shapePoints = [];
-
-    if (start.dx.isNaN || start.dy.isNaN || end.dx.isNaN || end.dy.isNaN) {
-      return shapePoints;
-    }
-
-    // Use the selected color but ensure full opacity for the paint operation if needed
-    // or strictly use _selectedColor.
-    final Paint shapePaint = Paint()
-      ..color = _selectedColor
-      ..strokeWidth =
-          _currentTool.toString().contains('filled') ? 1.0 : _strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..style =
-          PaintingStyle.stroke; // Default to stroke, change manually below
-
-    switch (_currentTool) {
-      case DrawingTool.circle:
-      case DrawingTool.filledCircle:
-        final dx = end.dx - start.dx;
-        final dy = end.dy - start.dy;
-        final distance = math.sqrt(dx * dx + dy * dy);
-
-        // FIX: Removed check for distance < 1.
-        if (distance.isNaN || distance.isInfinite) {
-          return shapePoints;
-        }
-
-        final radius = distance / 2;
-        final center = Offset(
-          (start.dx + end.dx) / 2,
-          (start.dy + end.dy) / 2,
-        );
-
-        if (_currentTool == DrawingTool.filledCircle) {
-          // Scanline fill
-          for (double y = center.dy - radius;
-              y <= center.dy + radius;
-              y += 1.0) {
-            final dy = y - center.dy;
-            // Protect against sqrt of negative number
-            final double sqrtTerm = radius * radius - dy * dy;
-            if (sqrtTerm < 0) continue;
-
-            final halfWidth = math.sqrt(sqrtTerm);
-
-            if (!halfWidth.isNaN && !halfWidth.isInfinite) {
-              for (double x = center.dx - halfWidth;
-                  x <= center.dx + halfWidth;
-                  x += 1.0) {
-                shapePoints.add(DrawingPoint(
-                  normalizedOffset: Offset(x, y), // Currently in Pixels
-                  paint: Paint()
-                    ..color = _selectedColor
-                    ..strokeWidth = 2, // Thicker for fill density
-                ));
-              }
-            }
-          }
-        } else {
-          // Outline
-          final steps = (2 * math.pi * radius).ceil();
-          for (int i = 0; i <= steps; i++) {
-            final angle = (2 * math.pi * i) / steps;
-            final x = center.dx + radius * math.cos(angle);
-            final y = center.dy + radius * math.sin(angle);
-            shapePoints.add(DrawingPoint(
-              normalizedOffset: Offset(x, y), // Currently in Pixels
-              paint: Paint()
-                ..color = _selectedColor
-                ..strokeWidth = _strokeWidth
-                ..strokeCap = StrokeCap.round,
-            ));
-          }
-        }
-        break;
-
-      case DrawingTool.rectangle:
-      case DrawingTool.filledRectangle:
-        final left = math.min(start.dx, end.dx);
-        final right = math.max(start.dx, end.dx);
-        final top = math.min(start.dy, end.dy);
-        final bottom = math.max(start.dy, end.dy);
-
-        if (_currentTool == DrawingTool.filledRectangle) {
-          // Scanline fill
-          for (double y = top; y <= bottom; y += 1.0) {
-            for (double x = left; x <= right; x += 1.0) {
-              shapePoints.add(DrawingPoint(
-                normalizedOffset: Offset(x, y),
-                paint: Paint()
-                  ..color = _selectedColor
-                  ..strokeWidth = 2,
-              ));
-            }
-          }
-        } else {
-          // Hollow Rectangle - Top
-          for (double x = left; x <= right; x += 1.0) {
-            shapePoints.add(DrawingPoint(
-              normalizedOffset: Offset(x, top),
-              paint: Paint()
-                ..color = _selectedColor
-                ..strokeWidth = _strokeWidth
-                ..strokeCap = StrokeCap.round,
-            ));
-          }
-          // Right
-          for (double y = top; y <= bottom; y += 1.0) {
-            shapePoints.add(DrawingPoint(
-              normalizedOffset: Offset(right, y),
-              paint: Paint()
-                ..color = _selectedColor
-                ..strokeWidth = _strokeWidth
-                ..strokeCap = StrokeCap.round,
-            ));
-          }
-          // Bottom
-          for (double x = right; x >= left; x -= 1.0) {
-            shapePoints.add(DrawingPoint(
-              normalizedOffset: Offset(x, bottom),
-              paint: Paint()
-                ..color = _selectedColor
-                ..strokeWidth = _strokeWidth
-                ..strokeCap = StrokeCap.round,
-            ));
-          }
-          // Left
-          for (double y = bottom; y >= top; y -= 1.0) {
-            shapePoints.add(DrawingPoint(
-              normalizedOffset: Offset(left, y),
-              paint: Paint()
-                ..color = _selectedColor
-                ..strokeWidth = _strokeWidth
-                ..strokeCap = StrokeCap.round,
-            ));
-          }
-        }
-        break;
-      default:
-        break;
-    }
-    return shapePoints;
-  }
-
   Widget _buildChatArea() {
     // Check if current user has answered
     final currentUserId = _currentUser?.id?.toString();
     final hasCurrentUserAnswered =
         currentUserId != null && _usersWhoAnswered.contains(currentUserId);
-    final shouldShowAnswerInput = !_isDrawer &&
-        !hasCurrentUserAnswered &&
-        _isAnswersChatExpanded &&
-        _currentPhase == 'drawing';
+    final shouldShowAnswerInput = (!_isDrawer &&
+            !hasCurrentUserAnswered &&
+            _isAnswersChatExpanded &&
+            _currentPhase == 'drawing') &&
+        ((_currentDrawerInfo?['team'] == _currentParticipant?.team));
 
     // If expanded, return full width chat (same height)
     if (_isAnswersChatExpanded || _isGeneralChatExpanded) {
@@ -9697,7 +9465,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                       itemCount: _answersChatMessages.length,
                                       itemBuilder: (context, i) {
                                         final m = _answersChatMessages[i];
-                                        print(_answersChatMessages[i]);
+                                        
                                         final isCorrect =
                                             m['isCorrect'] == true;
                                         final isPending =
@@ -9716,32 +9484,31 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                             children: [
                                               // Avatar
                                               Container(
-                                                clipBehavior: Clip.hardEdge,
+                                                padding: EdgeInsets.all(2.r),
                                                 decoration: BoxDecoration(
-                                                    shape: BoxShape.circle,
-                                                    border: BoxBorder.all(
-                                                        color: team != null
-                                                            ? team == 'blue'
-                                                                ? Colors.blue
-                                                                : Colors.orange
-                                                            : Colors.blue,
-                                                        width: 1)),
-                                                child: ClipOval(
-                                                  clipBehavior: Clip.hardEdge,
-                                                  child: CircleAvatar(
-                                                      radius: 16.r,
-                                                      backgroundColor:
-                                                          Colors.black,
-                                                      child: avatar != null
-                                                          ? Image.asset(avatar)
-                                                          : Text(
-                                                              userName[0]
-                                                                  .toUpperCase(),
-                                                              style: TextStyle(
-                                                                  fontSize:
-                                                                      12.sp,
-                                                                  color: Colors
-                                                                      .white))),
+                                                  shape: BoxShape.circle,
+                                                  border: Border.all(
+                                                    color: team == 'orange'
+                                                        ? Colors.orange
+                                                        : team == 'blue'
+                                                            ? Colors.blue
+                                                            : Colors.transparent,
+                                                    width: 2,
+                                                  ),
+                                                ),
+                                                child: CircleAvatar(
+                                                  radius: 16.r,
+                                                  backgroundColor: Colors.black,
+                                                  child: avatar != null
+                                                      ? Image.asset(avatar)
+                                                      : Text(
+                                                          userName[0]
+                                                              .toUpperCase(),
+                                                          style: TextStyle(
+                                                            fontSize: 12.sp,
+                                                            color: Colors.white,
+                                                          ),
+                                                        ),
                                                 ),
                                               ),
                                               SizedBox(width: 8.w),
@@ -9753,7 +9520,11 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                                     Text(
                                                       userName,
                                                       style: TextStyle(
-                                                        color: Colors.white,
+                                                        color: team == 'orange'
+                                                            ? Colors.orange
+                                                            : team == 'blue'
+                                                                ? Colors.blue
+                                                                : Colors.white,
                                                         fontSize: 12.sp,
                                                         fontWeight:
                                                             FontWeight.w500,
@@ -9875,25 +9646,25 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                       TooltipActionButton(
                         name: 'skip',
                         backgroundColor: Colors.white,
-                        textStyle: TextStyle(color: Colors.grey),
+                        textStyle: const TextStyle(color: Colors.grey),
                         type: TooltipDefaultActionType.skip,
                         onTap: () => ShowcaseView.get().dismiss(),
                       ),
                       TooltipActionButton(
                         name: 'Next',
-                        tailIcon: ActionButtonIcon(
+                        tailIcon: const ActionButtonIcon(
                           icon: Icon(Icons.arrow_forward_ios, size: 12),
                         ),
                         type: TooltipDefaultActionType.next,
                         backgroundColor: Colors.white,
-                        textStyle: TextStyle(color: Colors.black),
+                        textStyle: const TextStyle(color: Colors.black),
                         onTap: () => ShowcaseView.get().next(),
                       ),
                     ],
                     overlayColor: const Color.fromRGBO(116, 116, 116, 0.63),
                     showArrow: false,
                     toolTipMargin: 21,
-                    tooltipPadding: EdgeInsets.all(12),
+                    tooltipPadding: const EdgeInsets.all(12),
                     description:
                         "Click to View users and scores according to team wise  ",
                     key: showcasekey4,
@@ -10174,6 +9945,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                       final userName = m['userName'] ?? 'User';
                                       final avatar = m['avatar'];
                                       final team = m['team'];
+                                      final message = m['message'];
                                       return Padding(
                                         padding: EdgeInsets.symmetric(
                                           vertical: 6.h,
@@ -10183,28 +9955,32 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                               CrossAxisAlignment.start,
                                           children: [
                                             Container(
-                                              clipBehavior: Clip.hardEdge,
+                                              padding: EdgeInsets.all(2.r),
                                               decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  border: BoxBorder.all(
-                                                      color: team != null
-                                                          ? team == 'blue'
-                                                              ? Colors.blue
-                                                              : Colors.orange
-                                                          : Colors.blue,
-                                                      width: 1)),
+                                                shape: BoxShape.circle,
+                                                border: Border.all(
+                                                  color: team == 'orange'
+                                                      ? Colors.orange
+                                                      : team == 'blue'
+                                                          ? Colors.blue
+                                                          : Colors.transparent,
+                                                  width: 2,
+                                                ),
+                                              ),
                                               child: CircleAvatar(
-                                                  radius: 16.r,
-                                                  backgroundColor: Colors.black,
-                                                  child: avatar != null
-                                                      ? Image.asset(avatar)
-                                                      : Text(
-                                                          userName[0]
-                                                              .toUpperCase(),
-                                                          style: TextStyle(
-                                                              fontSize: 8.sp,
-                                                              color: Colors
-                                                                  .white))),
+                                                radius: 16.r,
+                                                backgroundColor: Colors.black,
+                                                child: avatar != null
+                                                    ? Image.asset(avatar)
+                                                    : Text(
+                                                        userName[0]
+                                                            .toUpperCase(),
+                                                        style: TextStyle(
+                                                            fontSize: 12.sp,
+                                                            color:
+                                                                Colors.white),
+                                                      ),
+                                              ),
                                             ),
                                             SizedBox(width: 8.w),
                                             Expanded(
@@ -10214,16 +9990,23 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                                 children: [
                                                   Text(
                                                     userName,
-                                                    style: const TextStyle(
-                                                      color: Colors.white70,
-                                                      fontSize: 12,
+                                                    style: TextStyle(
+                                                      color: team == 'orange'
+                                                          ? Colors.orange
+                                                          : team == 'blue'
+                                                              ? Colors.blue
+                                                              : Colors.white,
+                                                      fontSize: 12.sp,
+                                                      fontWeight:
+                                                          FontWeight.w500,
                                                     ),
                                                   ),
-                                                  SizedBox(height: 4.h),
+                                                  SizedBox(height: 2.h),
                                                   Text(
-                                                    m['message'] ?? '',
-                                                    style: const TextStyle(
+                                                    message,
+                                                    style: TextStyle(
                                                       color: Colors.white70,
+                                                      fontSize: 12.sp,
                                                     ),
                                                   ),
                                                 ],
@@ -10315,25 +10098,25 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                       TooltipActionButton(
                         name: 'skip',
                         backgroundColor: Colors.white,
-                        textStyle: TextStyle(color: Colors.grey),
+                        textStyle: const TextStyle(color: Colors.grey),
                         type: TooltipDefaultActionType.skip,
                         onTap: () => ShowcaseView.get().dismiss(),
                       ),
                       TooltipActionButton(
                         name: 'Next',
-                        tailIcon: ActionButtonIcon(
+                        tailIcon: const ActionButtonIcon(
                           icon: Icon(Icons.arrow_forward_ios, size: 12),
                         ),
                         type: TooltipDefaultActionType.next,
                         backgroundColor: Colors.white,
-                        textStyle: TextStyle(color: Colors.black),
+                        textStyle: const TextStyle(color: Colors.black),
                         onTap: () => ShowcaseView.get().next(),
                       ),
                     ],
                     overlayColor: const Color.fromRGBO(116, 116, 116, 0.63),
                     showArrow: false,
                     toolTipMargin: 21,
-                    tooltipPadding: EdgeInsets.all(12),
+                    tooltipPadding: const EdgeInsets.all(12),
                     description:
                         "Click to View users and scores according to team wise  ",
                     key: showcasekey5,
@@ -10543,7 +10326,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                       itemCount: _answersChatMessages.length,
                       itemBuilder: (context, i) {
                         final m = _answersChatMessages[i];
-                        print(_answersChatMessages[i]);
+                        
                         final isCorrect = m['isCorrect'] == true;
                         final isPending = m['type'] == 'pending';
                         final userName = m['userName'] ?? 'User';
@@ -10558,25 +10341,31 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                             children: [
                               // Avatar
                               Container(
-                                clipBehavior: Clip.hardEdge,
+                                padding: EdgeInsets.all(2.r),
                                 decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: BoxBorder.all(
-                                        color: team != null
-                                            ? team == 'blue'
-                                                ? Colors.blue
-                                                : Colors.orange
-                                            : Colors.blue,
-                                        width: 1)),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: team == 'orange'
+                                        ? Colors.orange
+                                        : team == 'blue'
+                                            ? Colors.blue
+                                            : Colors.transparent,
+                                    width: 2,
+                                  ),
+                                ),
                                 child: CircleAvatar(
-                                    radius: 16.r,
-                                    backgroundColor: Colors.black,
-                                    child: avatar != null
-                                        ? Image.asset(avatar)
-                                        : Text(userName[0].toUpperCase(),
-                                            style: TextStyle(
-                                                fontSize: 12.sp,
-                                                color: Colors.white))),
+                                  radius: 16.r,
+                                  backgroundColor: Colors.black,
+                                  child: avatar != null
+                                      ? Image.asset(avatar)
+                                      : Text(
+                                          userName[0].toUpperCase(),
+                                          style: TextStyle(
+                                            fontSize: 12.sp,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                ),
                               ),
                               SizedBox(width: 8.w),
                               Expanded(
@@ -10586,7 +10375,11 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                     Text(
                                       userName,
                                       style: TextStyle(
-                                        color: Colors.white,
+                                        color: team == 'orange'
+                                            ? Colors.orange
+                                            : team == 'blue'
+                                                ? Colors.blue
+                                                : Colors.white,
                                         fontSize: 12.sp,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -10638,7 +10431,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                           height: 30.h, // <<< SET HEIGHT HERE
                           padding: EdgeInsets.all(1.6.w),
                           decoration: BoxDecoration(
-                              gradient: LinearGradient(
+                              gradient: const LinearGradient(
                                   begin: Alignment.centerLeft,
                                   end: Alignment.centerRight,
                                   colors: [
@@ -10668,7 +10461,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                 borderSide: BorderSide.none,
                               ),
                               filled: true,
-                              fillColor: Color.fromRGBO(0, 0, 0, 1),
+                              fillColor: const Color.fromRGBO(0, 0, 0, 1),
                               contentPadding: EdgeInsets.symmetric(
                                 horizontal: 5.w,
                                 vertical: 8
@@ -10865,7 +10658,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     height: 30.h, // <<< SET HEIGHT HERE
                     padding: EdgeInsets.all(1.6.w),
                     decoration: BoxDecoration(
-                        gradient: LinearGradient(
+                        gradient: const LinearGradient(
                             begin: Alignment.centerLeft,
                             end: Alignment.centerRight,
                             colors: [
@@ -10895,7 +10688,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                           borderSide: BorderSide.none,
                         ),
                         filled: true,
-                        fillColor: Color.fromRGBO(0, 0, 0, 1),
+                        fillColor: const Color.fromRGBO(0, 0, 0, 1),
                         contentPadding: EdgeInsets.symmetric(
                           horizontal: 5.w,
                           vertical: 8
@@ -10955,9 +10748,9 @@ class _AnimationVideoState extends State<_AnimationVideo> {
     if (widget.controller != null && widget.controller!.value.isInitialized) {
       widget.controller!.seekTo(Duration.zero);
       widget.controller!.play();
-      print('✅ Video started playing');
+      
     } else {
-      print('❌ Video controller not ready');
+      
     }
   }
 
@@ -10965,7 +10758,7 @@ class _AnimationVideoState extends State<_AnimationVideo> {
     if (widget.controller != null && widget.controller!.value.isInitialized) {
       widget.controller!.pause();
       widget.controller!.seekTo(Duration.zero);
-      print('✅ Video stopped and reset');
+      
     }
   }
 
@@ -10993,7 +10786,7 @@ class _AnimationVideoState extends State<_AnimationVideo> {
   @override
   Widget build(BuildContext context) {
     if (widget.controller == null || !widget.controller!.value.isInitialized) {
-      print('❌ Video not initialized, showing loader');
+      
       return SizedBox(
         width: widget.width,
         height: widget.height,
@@ -11003,7 +10796,7 @@ class _AnimationVideoState extends State<_AnimationVideo> {
       );
     }
 
-    print('✅ Rendering video player');
+    
     return SizedBox(
       width: widget.width,
       height: widget.height,
@@ -11053,6 +10846,7 @@ class TeamScoreBar extends StatelessWidget {
             ((width - 20) /
                 ((width - 20) * (score <= 0 ? 1 : score / maxScore)))) -
         40);
+    
     print(
         ((width - 20) / ((width - 20) * (score <= 0 ? 1 : score / maxScore))));
     final isTablet = MediaQuery.of(context).size.width > 600;
@@ -11078,7 +10872,7 @@ class TeamScoreBar extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Spacer(),
+                  const Spacer(),
 
                   // CIRCLE LABEL
                   teamBadge(
@@ -11091,11 +10885,13 @@ class TeamScoreBar extends StatelessWidget {
             ),
           ),
           SizedBox(
-              width: (width /
-                      ((width - 20) /
-                          ((width - 20) *
-                              (score <= 0 ? 1 : score / maxScore)))) -
-                  80),
+              width: score == 0
+                  ? (width /
+                          ((width - 20) /
+                              ((width - 20) *
+                                  (score <= 0 ? 1 : score / maxScore)))) -
+                      80
+                  : (maxScore - score).clamp(0, width - 20).toDouble()),
 
           // TROPHY ICON
           Icon(

@@ -9,7 +9,6 @@ import 'package:inkbattle_frontend/repositories/room_repository.dart';
 import 'package:inkbattle_frontend/repositories/user_repository.dart';
 import 'package:inkbattle_frontend/services/ad_service.dart';
 import 'package:inkbattle_frontend/utils/lang.dart';
-import 'package:inkbattle_frontend/utils/routes/routes.dart';
 import 'package:inkbattle_frontend/widgets/blue_background_scaffold.dart';
 import 'package:inkbattle_frontend/widgets/custom_svg.dart';
 
@@ -40,9 +39,9 @@ class _OneVsOneScreenState extends State<OneVsOneScreen> {
 
   bool isButtonPressed = false;
   Color gradientStartColor =
-      Color.fromRGBO(110, 136, 206, 1); // rgba(110, 136, 206, 1)
+      const Color.fromRGBO(110, 136, 206, 1); // rgba(110, 136, 206, 1)
   Color gradientEndColor =
-      Color.fromRGBO(44, 61, 106, 1); // rgba(44, 61, 106, 1)
+      const Color.fromRGBO(44, 61, 106, 1); // rgba(44, 61, 106, 1)
 
   // The thickness of the gradient border
   double borderWidth = 1.2;
@@ -77,7 +76,7 @@ class _OneVsOneScreenState extends State<OneVsOneScreen> {
         (roomResponse) async {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                 content:
                     Text('Successfully joined room! Entry cost: 250 coins'),
                 backgroundColor: Colors.green,
@@ -155,9 +154,11 @@ class _OneVsOneScreenState extends State<OneVsOneScreen> {
 
         return BlueBackgroundScaffold(
           child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: 25.w,
-              vertical: isTablet ? 20.h : 15.h,
+            padding: EdgeInsets.only(
+              left: 25.w,
+              right: 25.w,
+              top: isTablet ? 20.h : 15.h,
+              bottom: 0,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -193,7 +194,7 @@ class _OneVsOneScreenState extends State<OneVsOneScreen> {
                         ),
                         padding: EdgeInsets.all(borderWidth),
                         child: CircleAvatar(
-                          backgroundColor: Color.fromRGBO(26, 42, 81, 1),
+                          backgroundColor: const Color.fromRGBO(26, 42, 81, 1),
                           radius: 50.r,
                           child: Image.asset(
                             _getCategoryIcon(widget.category),
@@ -242,7 +243,7 @@ class _OneVsOneScreenState extends State<OneVsOneScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Column(
+                          const Column(
                             children: [
                               // Row(
                               //   children: [
@@ -407,7 +408,6 @@ class _OneVsOneScreenState extends State<OneVsOneScreen> {
                       ),
                     ),
                   ),
-                SizedBox(height: 10.h),
               ],
             ),
           ),

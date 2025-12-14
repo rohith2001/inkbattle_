@@ -5,14 +5,13 @@ class Environment {
   // Run: adb reverse tcp:4000 tcp:4000
   // For iOS Simulator, also use localhost
 
-  // static const String apiBaseUrl = "http://35.154.241.0:4000/api";
-  // static const String socketUrl = "http://35.154.241.0:4000";
-  // UPDATED: Using AWS Public DNS to pass Apple IPv6 Review
-  static const String apiBaseUrl = "http://ec2-35-154-241-0.ap-south-1.compute.amazonaws.com:4000/api";
-  static const String socketUrl = "http://ec2-35-154-241-0.ap-south-1.compute.amazonaws.com:4000";
+  static const String apiBaseUrl =
+      "http://ec2-35-154-241-0.ap-south-1.compute.amazonaws.com:4000/api";
+  static const String socketUrl =
+      "http://ec2-35-154-241-0.ap-south-1.compute.amazonaws.com:4000";
 
-  // static const String apiBaseUrl = "http://192.168.1.6:4000/api";
-  // static const String socketUrl = "http://192.168.1.6:4000";
+  //static const String apiBaseUrl = "http://192.168.1.6:4000/api";
+//  static const String socketUrl = "http://192.168.1.6:4000";
 
   // static const String apiBaseUrl =
   //     "https://inkbattle-a-backend.onrender.com/api";

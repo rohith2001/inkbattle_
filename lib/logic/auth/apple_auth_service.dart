@@ -27,8 +27,7 @@ class AppleAuthService {
         accessToken: appleCredential.authorizationCode,
       );
 
-      final userCredential =
-          await _auth.signInWithCredential(oauthCredential);
+      final userCredential = await _auth.signInWithCredential(oauthCredential);
 
       // Prefer name from Apple if provided, else from Firebase user.
       final displayName = [
@@ -112,4 +111,3 @@ class AppleAuthService {
     }
   }
 }
-

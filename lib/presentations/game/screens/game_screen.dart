@@ -641,7 +641,7 @@ class _GameScreenState extends State<GameScreen> {
                     context: context,
                     builder: (context) => ErrorPopup(
                       roomId: 0,
-                      participants: [],
+                      participants: const [],
                     ),
                   ),
                 ),

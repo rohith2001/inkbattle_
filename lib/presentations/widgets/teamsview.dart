@@ -65,7 +65,7 @@ class TeamDisplayPopup extends StatelessWidget {
                         : AppImages.redflg_teamB),
                     fit: BoxFit.cover,
                   ),
-                  borderRadius: BorderRadius.only(
+                  borderRadius: const BorderRadius.only(
                     topLeft: Radius.circular(18),
                     topRight: Radius.circular(18),
                   ),
@@ -82,7 +82,7 @@ class TeamDisplayPopup extends StatelessWidget {
                       return Container(
                         decoration: BoxDecoration(
                             border: BoxBorder.fromLTRB(
-                                bottom: BorderSide(
+                                bottom: const BorderSide(
                                     color: Color.fromRGBO(36, 38, 63, 1)))),
                         margin: EdgeInsets.only(bottom: 10.h),
                         padding: EdgeInsets.symmetric(

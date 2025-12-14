@@ -49,10 +49,10 @@ class _SignInScreenState extends State<SignInScreen> {
         // Save token and navigate to home
         await LocalStorageUtils.saveUserDetails(authResponse.token!);
         print('Google sign-in successful, token saved');
-        
+
         // Fetch user profile and apply language preference
         await _applyUserLanguagePreference();
-        
+
         if (mounted) {
           // Show coin animation if user is new
           if (authResponse.isNew == true) {
@@ -72,8 +72,7 @@ class _SignInScreenState extends State<SignInScreen> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(AppLocalizations.googleSignInFailed)),
+            SnackBar(content: Text(AppLocalizations.googleSignInFailed)),
           );
         }
       }
@@ -81,7 +80,9 @@ class _SignInScreenState extends State<SignInScreen> {
       print('Google sign-in error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppLocalizations.signInError}: ${e.toString()}')),
+          SnackBar(
+              content:
+                  Text('${AppLocalizations.signInError}: ${e.toString()}')),
         );
       }
     } finally {
@@ -162,20 +163,24 @@ class _SignInScreenState extends State<SignInScreen> {
             // Handle both full names (Hindi, Telugu, English) and codes (hi, te, en)
             String languageCode = 'en';
             final userLang = user.language!.trim();
-            
+
             // Check for full names first (case-insensitive)
-            if (userLang.toLowerCase() == 'hindi' || userLang.toLowerCase() == 'hi') {
+            if (userLang.toLowerCase() == 'hindi' ||
+                userLang.toLowerCase() == 'hi') {
               languageCode = 'hi';
-            } else if (userLang.toLowerCase() == 'telugu' || userLang.toLowerCase() == 'te') {
+            } else if (userLang.toLowerCase() == 'telugu' ||
+                userLang.toLowerCase() == 'te') {
               languageCode = 'te';
-            } else if (userLang.toLowerCase() == 'english' || userLang.toLowerCase() == 'en') {
+            } else if (userLang.toLowerCase() == 'english' ||
+                userLang.toLowerCase() == 'en') {
               languageCode = 'en';
             }
-            
+
             // Save and apply language
             await LocalStorageUtils.saveLanguage(languageCode);
             AppLocalizations.setLanguage(languageCode);
-            print('Applied user language preference: $languageCode from user.language: ${user.language}');
+            print(
+                'Applied user language preference: $languageCode from user.language: ${user.language}');
           }
         },
       );
@@ -200,10 +205,10 @@ class _SignInScreenState extends State<SignInScreen> {
         // Save token and navigate to home
         await LocalStorageUtils.saveUserDetails(authResponse.token!);
         print('Facebook sign-in successful, token saved');
-        
+
         // Fetch user profile and apply language preference
         await _applyUserLanguagePreference();
-        
+
         if (mounted) {
           // Show coin animation if user is new
           if (authResponse.isNew == true) {
@@ -223,8 +228,7 @@ class _SignInScreenState extends State<SignInScreen> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text(AppLocalizations.facebookSignInFailed)),
+            SnackBar(content: Text(AppLocalizations.facebookSignInFailed)),
           );
         }
       }
@@ -232,7 +236,9 @@ class _SignInScreenState extends State<SignInScreen> {
       print('Facebook sign-in error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${AppLocalizations.signInError}: ${e.toString()}')),
+          SnackBar(
+              content:
+                  Text('${AppLocalizations.signInError}: ${e.toString()}')),
         );
       }
     } finally {
@@ -343,7 +349,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         SizedBox(width: 30.w),
                         TextWidget(
                           text: Platform.isIOS
-                              ? ( _isAppleLoading
+                              ? (_isAppleLoading
                                   ? AppLocalizations.signingIn
                                   : 'Sign in with Apple')
                               : (_isGoogleLoading

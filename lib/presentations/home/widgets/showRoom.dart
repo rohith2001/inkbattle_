@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:inkbattle_frontend/constants/app_images.dart';
 import 'package:inkbattle_frontend/presentations/home/widgets/button.dart';
 import 'package:inkbattle_frontend/presentations/home/widgets/joinRoom.dart';
+import 'package:inkbattle_frontend/utils/lang.dart';
 
 class RoomPopup extends StatelessWidget {
   const RoomPopup({super.key});
@@ -35,7 +36,7 @@ class RoomPopup extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     CustomRoomButton(
-                      text: 'CREATE ROOM',
+                      text: AppLocalizations.createRoom.toUpperCase(),
                       onPressed: () {
                         Navigator.pop(context);
                         context.push('/create-room');
@@ -43,10 +44,10 @@ class RoomPopup extends StatelessWidget {
                     ),
                     SizedBox(height: 35.h),
                     CustomRoomButton(
-                      text: 'JOIN ROOM',
+                      text: AppLocalizations.joinRoom.toUpperCase(),
                       onPressed: () {
                         showDialog(
-                            context: context, builder: (_) => JoinRoomPopup());
+                            context: context, builder: (_) => const JoinRoomPopup());
                       },
                     ),
                   ],

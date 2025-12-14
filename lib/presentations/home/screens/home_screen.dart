@@ -231,189 +231,198 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       builder: (context, child) {
         return BlueBackgroundScaffold(
           child: SafeArea(
+            bottom: false,
             child: SizedBox(
               key: ValueKey(AppLocalizations
                   .getCurrentLanguage()), // Force rebuild on language change
               height: 1.sh,
-              child: Column(
-                mainAxisSize: MainAxisSize.max,
-                children: [
-                  CustomTopBar(
-                    key: ValueKey(_headerKey),
-                    user: _currentUser,
-                  ),
-                  SizedBox(height: 15.h),
-                  Padding(
-                    padding: EdgeInsets.only(top: 1.h),
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        double circleSize = isTablet ? 0.55.sw : 0.7.sw;
-                        circleSize = circleSize.clamp(
-                            isTablet ? 300 : 200, isTablet ? 600 : 400);
-                        return Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Container(
-                              width: circleSize,
-                              height: circleSize,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.5),
-                                  width: 3.w,
-                                ),
-                              ),
-                              child: Center(
-                                child: Image.asset(
-                                  AppImages.homelogoPng,
-                                  width: circleSize * 0.80,
-                                  height: circleSize * 0.80,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              left: circleSize * 0.01,
-                              top: circleSize * 0.01,
-                              child: Material(
-                                color: Colors.transparent,
-                                shape: const CircleBorder(),
-                                child: InkWell(
-                                  onTap: () async {
-                                    await showDialog(
-                                      context: context,
-                                      barrierDismissible: true,
-                                      barrierColor:
-                                          Colors.black.withOpacity(0.8),
-                                      builder: (_) => DailyCoinsPopup(
-                                        onClaimed: (coins) {
-                                          _loadUserData();
-                                        },
-                                      ),
-                                    );
-                                  },
-                                  customBorder: const CircleBorder(),
-                                  splashColor: Colors.white24,
-                                  highlightColor: Colors.white10,
-                                  child: SizedBox(
-                                    width: isTablet
-                                        ? circleSize * 0.35
-                                        : circleSize * 0.3,
-                                    height: isTablet
-                                        ? circleSize * 0.35
-                                        : circleSize * 0.3,
+              child: Center(
+                child: SizedBox(
+                  width: MediaQuery.of(context).size.width > 600
+                      ? 600
+                      : MediaQuery.of(context).size.width,
+                  height: 1.sh,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.max,
+                    children: [
+                      CustomTopBar(
+                        key: ValueKey(_headerKey),
+                        user: _currentUser,
+                      ),
+                      SizedBox(height: isTablet ? 20.h : 15.h),
+                      Padding(
+                        padding: EdgeInsets.only(top: isTablet ? 2.h : 1.h),
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            double circleSize = isTablet ? 0.45.sw : 0.7.sw;
+                            circleSize = circleSize.clamp(
+                                isTablet ? 320 : 200, isTablet ? 500 : 400);
+                            return Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Container(
+                                  width: circleSize,
+                                  height: circleSize,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.5),
+                                      width: isTablet ? 4.w : 3.w,
+                                    ),
+                                  ),
+                                  child: Center(
                                     child: Image.asset(
-                                      AppImages.dailycoins,
+                                      AppImages.homelogoPng,
+                                      width: circleSize * 0.80,
+                                      height: circleSize * 0.80,
                                       fit: BoxFit.contain,
                                     ),
                                   ),
                                 ),
-                              ),
-                            ),
-                            Positioned(
-                              right: circleSize * 0.01,
-                              bottom: circleSize * 0.01,
-                              child: Material(
-                                color: Colors.transparent,
-                                shape: const CircleBorder(),
-                                child: InkWell(
-                                  onTap: () {
-                                    AdsFreePopup.show(
-                                      context,
-                                      onAdWatched: (coins) {
-                                        VideoRewardDialog.show(
+                                Positioned(
+                                  left: circleSize * 0.01,
+                                  top: circleSize * 0.01,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    shape: const CircleBorder(),
+                                    child: InkWell(
+                                      onTap: () async {
+                                        await showDialog(
+                                          context: context,
+                                          barrierDismissible: true,
+                                          barrierColor:
+                                              Colors.black.withOpacity(0.8),
+                                          builder: (_) => DailyCoinsPopup(
+                                            onClaimed: (coins) {
+                                              _loadUserData();
+                                            },
+                                          ),
+                                        );
+                                      },
+                                      customBorder: const CircleBorder(),
+                                      splashColor: Colors.white24,
+                                      highlightColor: Colors.white10,
+                                      child: SizedBox(
+                                        width: isTablet
+                                            ? circleSize * 0.32
+                                            : circleSize * 0.3,
+                                        height: isTablet
+                                            ? circleSize * 0.32
+                                            : circleSize * 0.3,
+                                        child: Image.asset(
+                                          AppImages.dailycoins,
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  right: circleSize * 0.01,
+                                  bottom: circleSize * 0.01,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    shape: const CircleBorder(),
+                                    child: InkWell(
+                                      onTap: () {
+                                        AdsFreePopup.show(
                                           context,
-                                          coinsAwarded: coins,
-                                          onComplete: () {
-                                            print(
-                                                '📍 Video animation completed');
-                                            // widget.onAdWatched?.call();
+                                          onAdWatched: (coins) {
+                                            VideoRewardDialog.show(
+                                              context,
+                                              coinsAwarded: coins,
+                                              onComplete: () {
+                                                print(
+                                                    '📍 Video animation completed');
+                                                // widget.onAdWatched?.call();
+                                              },
+                                            );
+                                            // Refresh user data after ad watched
+                                            _loadUserData();
                                           },
                                         );
-                                        // Refresh user data after ad watched
-                                        _loadUserData();
                                       },
-                                    );
-                                  },
-                                  customBorder: const CircleBorder(),
-                                  splashColor: Colors.white24,
-                                  highlightColor: Colors.white10,
-                                  child: SizedBox(
-                                    width: isTablet
-                                        ? circleSize * 0.35
-                                        : circleSize * 0.3,
-                                    height: isTablet
-                                        ? circleSize * 0.35
-                                        : circleSize * 0.3,
-                                    child: Image.asset(
-                                      AppImages.adsfree,
-                                      fit: BoxFit.contain,
+                                      customBorder: const CircleBorder(),
+                                      splashColor: Colors.white24,
+                                      highlightColor: Colors.white10,
+                                      child: SizedBox(
+                                        width: isTablet
+                                            ? circleSize * 0.32
+                                            : circleSize * 0.3,
+                                        height: isTablet
+                                            ? circleSize * 0.32
+                                            : circleSize * 0.3,
+                                        child: Image.asset(
+                                          AppImages.adsfree,
+                                          fit: BoxFit.contain,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  SizedBox(height: 20.h),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      children: [
-                        CustomRoomButton(
-                          text: AppLocalizations.playRandom,
-                          onPressed: () => context.push('/room-preferences'),
-                        ),
-                        SizedBox(height: 10.h),
-                        CustomRoomButton(
-                          text: AppLocalizations.friends,
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              barrierDismissible: true,
-                              barrierColor: Colors.black.withOpacity(0.8),
-                              builder: (_) => const RoomPopup(),
+                              ],
                             );
                           },
                         ),
-                        SizedBox(height: 10.h),
-                        CustomRoomButton(
-                          text: AppLocalizations.multiplayer,
-                          onPressed: () => context.push(Routes.multiplayer,
-                              extra: {'bannerAd': _bannerAd}),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 10.h),
-                  // Banner Ad
-                  if (_isBannerAdLoaded && _bannerAd != null)
-                    Container(
-                      width: double.infinity,
-                      height: 60.h,
-                      color: Colors.black.withOpacity(0.3),
-                      child: AdWidget(ad: _bannerAd!),
-                    )
-                  else
-                    Container(
-                      width: double.infinity,
-                      height: 60.h,
-                      color: Colors.grey.withOpacity(0.2),
-                      child: Center(
-                        child: Text(
-                          AppLocalizations.loadingAds,
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12.sp,
-                          ),
+                      ),
+                      SizedBox(height: isTablet ? 25.h : 20.h),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          children: [
+                            CustomRoomButton(
+                              text: AppLocalizations.playRandom,
+                              onPressed: () =>
+                                  context.push('/room-preferences'),
+                            ),
+                            SizedBox(height: isTablet ? 15.h : 10.h),
+                            CustomRoomButton(
+                              text: AppLocalizations.friends,
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: true,
+                                  barrierColor: Colors.black.withOpacity(0.8),
+                                  builder: (_) => const RoomPopup(),
+                                );
+                              },
+                            ),
+                            SizedBox(height: isTablet ? 15.h : 10.h),
+                            CustomRoomButton(
+                              text: AppLocalizations.multiplayer,
+                              onPressed: () => context.push(Routes.multiplayer,
+                                  extra: {'bannerAd': _bannerAd}),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  SizedBox(height: 10.h),
-                ],
+                      SizedBox(height: 10.h),
+                      // Banner Ad
+                      if (_isBannerAdLoaded && _bannerAd != null)
+                        Container(
+                          width: double.infinity,
+                          height: 60.h,
+                          color: Colors.black.withOpacity(0.3),
+                          child: AdWidget(ad: _bannerAd!),
+                        )
+                      else
+                        Container(
+                          width: double.infinity,
+                          height: 60.h,
+                          color: Colors.grey.withOpacity(0.2),
+                          child: Center(
+                            child: Text(
+                              AppLocalizations.loadingAds,
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12.sp,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
@@ -427,9 +436,9 @@ class CustomTopBar extends StatefulWidget {
   final UserModel? user;
 
   const CustomTopBar({
-    Key? key,
+    super.key,
     required this.user,
-  }) : super(key: key);
+  });
 
   @override
   State<CustomTopBar> createState() => _CustomTopBarState();
@@ -482,7 +491,8 @@ class _CustomTopBarState extends State<CustomTopBar> {
     final displayUser = _localUser ?? widget.user;
     final coins = displayUser?.coins ?? 0;
     // Default to av3.png if no avatar exists (for both current and new users)
-    final avatar = displayUser?.avatar ?? displayUser?.profilePicture ?? AppImages.av3;
+    final avatar =
+        displayUser?.avatar ?? displayUser?.profilePicture ?? AppImages.av3;
 
     return SafeArea(
       child: SizedBox(
@@ -580,7 +590,7 @@ class _CustomTopBarState extends State<CustomTopBar> {
                         child: Container(
                           alignment: Alignment.center,
                           clipBehavior: Clip.hardEdge,
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                           ),
                           child: ClipOval(

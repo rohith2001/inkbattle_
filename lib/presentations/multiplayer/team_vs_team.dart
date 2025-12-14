@@ -5,12 +5,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:inkbattle_frontend/constants/app_images.dart';
 import 'package:inkbattle_frontend/models/room_model.dart';
-import 'package:inkbattle_frontend/presentations/widgets/winner.dart';
+
 import 'package:inkbattle_frontend/repositories/room_repository.dart';
 import 'package:inkbattle_frontend/repositories/user_repository.dart';
 import 'package:inkbattle_frontend/services/ad_service.dart';
 import 'package:inkbattle_frontend/utils/lang.dart';
-import 'package:inkbattle_frontend/utils/routes/routes.dart';
+
 import 'package:inkbattle_frontend/widgets/blue_background_scaffold.dart';
 import 'package:inkbattle_frontend/widgets/custom_svg.dart';
 
@@ -69,9 +69,9 @@ class _TeamVsTeamScreenState extends State<TeamVsTeamScreen> {
         (roomResponse) async {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    'Successfully joined room! Entry cost: 250 coins'),
+              const SnackBar(
+                content:
+                    Text('Successfully joined room! Entry cost: 250 coins'),
                 backgroundColor: Colors.green,
               ),
             );
@@ -139,6 +139,17 @@ class _TeamVsTeamScreenState extends State<TeamVsTeamScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Calculate team counts
+    int teamACount = 0;
+    int teamBCount = 0;
+    if (widget.roomModel.participants != null) {
+      teamACount =
+          widget.roomModel.participants!.where((p) => p.team == 'blue').length;
+      teamBCount = widget.roomModel.participants!
+          .where((p) => p.team == 'orange')
+          .length;
+    }
+
     return ScreenUtilInit(
       designSize: const Size(390, 844),
       minTextAdapt: true,
@@ -149,8 +160,11 @@ class _TeamVsTeamScreenState extends State<TeamVsTeamScreen> {
           backgroundColor: const Color(0xFF0B2A50),
           body: BlueBackgroundScaffold(
             child: Padding(
-              padding: EdgeInsets.symmetric(
-                  horizontal: 25.w, vertical: isTablet ? 20.h : 15.h),
+              padding: EdgeInsets.only(
+                  left: 25.w,
+                  right: 25.w,
+                  top: isTablet ? 20.h : 15.h,
+                  bottom: 0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -206,60 +220,7 @@ class _TeamVsTeamScreenState extends State<TeamVsTeamScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Container(
-                              padding: EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(9),
-                                  border: selectedTeam == "orange"
-                                      ? Border.all(
-                                          color: Colors.white, width: 2)
-                                      : null),
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  if (mounted)
-                                    setState(() {
-                                      selectedTeam = "orange";
-                                    });
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10.r),
-                                  ),
-                                  backgroundColor: Colors.transparent,
-                                  shadowColor: Colors.transparent,
-                                ),
-                                child: Ink(
-                                  decoration: BoxDecoration(
-                                    gradient: const LinearGradient(
-                                      colors: [
-                                        Color(0xFF85CCE6),
-                                        Color(0xFF39B7E5),
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(10.r),
-                                  ),
-                                  child: Container(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: 8.h,
-                                      horizontal: 15.w,
-                                    ),
-                                    child: Text(
-                                      "Team A",
-                                      style: GoogleFonts.lato(
-                                        color: const Color(0xFF003143),
-                                        fontSize: 20.sp,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 15.w),
-                            Container(
-                              padding: EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(9),
                                   border: selectedTeam == "blue"
@@ -268,10 +229,11 @@ class _TeamVsTeamScreenState extends State<TeamVsTeamScreen> {
                                       : null),
                               child: ElevatedButton(
                                 onPressed: () {
-                                  if (mounted)
+                                  if (mounted) {
                                     setState(() {
                                       selectedTeam = "blue";
                                     });
+                                  }
                                 },
                                 style: ElevatedButton.styleFrom(
                                   padding: EdgeInsets.zero,
@@ -298,13 +260,97 @@ class _TeamVsTeamScreenState extends State<TeamVsTeamScreen> {
                                       vertical: 8.h,
                                       horizontal: 15.w,
                                     ),
-                                    child: Text(
-                                      "Team B",
-                                      style: GoogleFonts.lato(
-                                        color: const Color(0xFF003143),
-                                        fontSize: 20.sp,
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          "Team A",
+                                          style: GoogleFonts.lato(
+                                            color: const Color(0xFF003143),
+                                            fontSize: 20.sp,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        Text(
+                                          "($teamACount Players)",
+                                          style: GoogleFonts.lato(
+                                            color: const Color(0xFF003143)
+                                                .withOpacity(0.7),
+                                            fontSize: 12.sp,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 15.w),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(9),
+                                  border: selectedTeam == "orange"
+                                      ? Border.all(
+                                          color: Colors.white, width: 2)
+                                      : null),
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  if (mounted) {
+                                    setState(() {
+                                      selectedTeam = "orange";
+                                    });
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10.r),
+                                  ),
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                ),
+                                child: Ink(
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [
+                                        Color(0xFF85CCE6),
+                                        Color(0xFF39B7E5),
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(10.r),
+                                  ),
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 8.h,
+                                      horizontal: 15.w,
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          "Team B",
+                                          style: GoogleFonts.lato(
+                                            color: const Color(0xFF003143),
+                                            fontSize: 20.sp,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        Text(
+                                          "($teamBCount Players)",
+                                          style: GoogleFonts.lato(
+                                            color: const Color(0xFF003143)
+                                                .withOpacity(0.7),
+                                            fontSize: 12.sp,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
@@ -312,7 +358,7 @@ class _TeamVsTeamScreenState extends State<TeamVsTeamScreen> {
                             ),
                           ],
                         ),
-                        SizedBox(height: 8.h),
+                        SizedBox(height: 20.h),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -320,34 +366,15 @@ class _TeamVsTeamScreenState extends State<TeamVsTeamScreen> {
                               children: [
                                 CustomSvgImage(
                                   imageUrl: AppImages.userSvg,
-                                  width: 12.w,
-                                  height: 12.w,
+                                  width: 16.w,
+                                  height: 16.w,
                                 ),
-                                SizedBox(width: 5.w),
+                                SizedBox(width: 8.w),
                                 Text(
-                                  "13/15",
+                                  "Total Players: ${widget.roomModel.participantCount}/${widget.roomModel.maxPlayers}",
                                   style: GoogleFonts.lato(
                                     color: const Color(0xFFB9C7E7),
-                                    fontSize: 15.sp,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(width: 50.w),
-                            Row(
-                              children: [
-                                CustomSvgImage(
-                                  imageUrl: AppImages.userSvg,
-                                  width: 12.w,
-                                  height: 12.w,
-                                ),
-                                SizedBox(width: 5.w),
-                                Text(
-                                  "${widget.roomModel.participantCount}/${widget.roomModel.maxPlayers}",
-                                  style: GoogleFonts.lato(
-                                    color: const Color(0xFFB9C7E7),
-                                    fontSize: 15.sp,
+                                    fontSize: 16.sp,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -454,8 +481,9 @@ class _TeamVsTeamScreenState extends State<TeamVsTeamScreen> {
                         SizedBox(height: isTablet ? 44.h : 99.h),
                         GestureDetector(
                           onTap: () {
-                            if (!isButtonPressed)
+                            if (!isButtonPressed) {
                               _handleJoinRoom(widget.roomId);
+                            }
                             if (mounted) {
                               setState(() {
                                 isButtonPressed = !isButtonPressed;
@@ -531,7 +559,6 @@ class _TeamVsTeamScreenState extends State<TeamVsTeamScreen> {
                         ),
                       ),
                     ),
-                  SizedBox(height: 10.h),
                 ],
               ),
             ),

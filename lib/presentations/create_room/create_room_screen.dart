@@ -181,8 +181,8 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
     // Validate room name
     if (_roomNameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a room name'),
+        SnackBar(
+          content: Text(AppLocalizations.pleaseEnterRoomName),
           backgroundColor: Colors.orange,
         ),
       );
@@ -204,7 +204,8 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text('Failed to create room: ${failure.message}'),
+                content: Text(
+                    '${AppLocalizations.failedToCreateRoom}: ${failure.message}'),
                 backgroundColor: Colors.red,
               ),
             );
@@ -253,7 +254,7 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
           borderRadius: BorderRadius.circular(20.r),
         ),
         title: TextWidget(
-          text: "Room Created!",
+          text: AppLocalizations.roomCreated,
           fontSize: 20.sp,
           fontWeight: FontWeight.bold,
           color: AppColors.whiteColor,
@@ -262,7 +263,7 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             TextWidget(
-              text: "Share this code with your friends:",
+              text: AppLocalizations.shareCodeWithFriends,
               fontSize: 14.sp,
               color: Colors.grey,
             ),
@@ -289,8 +290,8 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: code));
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Code copied to clipboard!'),
+                        SnackBar(
+                          content: Text(AppLocalizations.codeCopiedClipboard),
                           backgroundColor: Colors.green,
                         ),
                       );
@@ -311,7 +312,7 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
               }
             },
             child: TextWidget(
-              text: "Enter Room",
+              text: AppLocalizations.enterRoom,
               fontSize: 16.sp,
               color: Colors.blue,
             ),
@@ -329,112 +330,118 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
 
     return BlueBackgroundScaffold(
       child: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 15.h),
-          child: Column(
-            children: [
-              // Header
-              Row(
+        bottom: false,
+        child: Center(
+          child: SizedBox(
+            width: MediaQuery.of(context).size.width > 600
+                ? 600
+                : MediaQuery.of(context).size.width,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 15.h),
+              child: Column(
                 children: [
-                  GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: const CustomSvgImage(
-                      imageUrl: AppImages.arrow_back,
-                      height: 25,
-                      width: 25,
-                    ),
-                  ),
-                  SizedBox(width: 15.w),
-                  TextWidget(
-                    text:
-                        widget.isTeamMode ? "Create Team Room" : AppLocalizations.createRoom,
-                    fontSize: 20.sp,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.whiteColor,
-                  ),
-                ],
-              ),
-              SizedBox(height: 20.h),
-
-              // Form - Simplified to just room name
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  // Header
+                  Row(
                     children: [
-                      SizedBox(height: 40.h),
-
-                      // Info text
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20.w),
-                        child: TextWidget(
-                          text:
-                              "Create a room and configure settings in the lobby",
-                          fontSize: 14.sp,
-                          color: Colors.white70,
-                          textAlign: TextAlign.center,
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: const CustomSvgImage(
+                          imageUrl: AppImages.arrow_back,
+                          height: 25,
+                          width: 25,
                         ),
                       ),
-                      SizedBox(height: 30.h),
-
-                      // Room Name
-                      TextformFieldWidget(
-                        controller: _roomNameController,
-                        height: 50.h,
-                        rouneded: 25.r,
-                        fontSize: 16.sp,
-                        hintText: "Enter room name",
-                        hintTextColor:
-                            const Color.fromRGBO(255, 255, 255, 0.52),
-                      ),
-                      SizedBox(height: 40.h),
-
-                      // Create button
-                      _buildCreateButton(),
-
-                      SizedBox(height: 20.h),
-
-                      // Additional info
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20.w),
-                        child: TextWidget(
-                          text:
-                              "You'll be able to share the room code with friends after creation",
-                          fontSize: 12.sp,
-                          color: Colors.grey,
-                          textAlign: TextAlign.center,
-                        ),
+                      SizedBox(width: 15.w),
+                      TextWidget(
+                        text: widget.isTeamMode
+                            ? AppLocalizations.createTeamRoom
+                            : AppLocalizations.createRoom,
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.whiteColor,
                       ),
                     ],
                   ),
-                ),
-              ),
-              SizedBox(height: 10.h),
-              // Banner Ad
-              if (_isBannerAdLoaded && _bannerAd != null)
-                Container(
-                  width: double.infinity,
-                  height: 60.h,
-                  color: Colors.black.withOpacity(0.3),
-                  child: AdWidget(ad: _bannerAd!),
-                )
-              else
-                Container(
-                  width: double.infinity,
-                  height: 60.h,
-                  color: Colors.grey.withOpacity(0.2),
-                  child: Center(
-                    child: Text(
-                      AppLocalizations.loadingAds,
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12.sp,
+                  SizedBox(height: 20.h),
+
+                  // Form - Simplified to just room name
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(height: 40.h),
+
+                          // Info text
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 20.w),
+                            child: TextWidget(
+                              text: AppLocalizations.createRoomConfigureLobby,
+                              fontSize: 14.sp,
+                              color: Colors.white70,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          SizedBox(height: 30.h),
+
+                          // Room Name
+                          TextformFieldWidget(
+                            controller: _roomNameController,
+                            height: 50.h,
+                            rouneded: 25.r,
+                            fontSize: 16.sp,
+                            hintText: AppLocalizations.enterRoomNameHint,
+                            hintTextColor:
+                                const Color.fromRGBO(255, 255, 255, 0.52),
+                          ),
+                          SizedBox(height: 40.h),
+
+                          // Create button
+                          _buildCreateButton(),
+
+                          SizedBox(height: 20.h),
+
+                          // Additional info
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 20.w),
+                            child: TextWidget(
+                              text: AppLocalizations.roomCodeShareInfo,
+                              fontSize: 12.sp,
+                              color: Colors.grey,
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-              SizedBox(height: 10.h),
-            ],
+                  SizedBox(height: 10.h),
+                  // Banner Ad
+                  if (_isBannerAdLoaded && _bannerAd != null)
+                    Container(
+                      width: double.infinity,
+                      height: 60.h,
+                      color: Colors.black.withOpacity(0.3),
+                      child: AdWidget(ad: _bannerAd!),
+                    )
+                  else
+                    Container(
+                      width: double.infinity,
+                      height: 60.h,
+                      color: Colors.grey.withOpacity(0.2),
+                      child: Center(
+                        child: Text(
+                          AppLocalizations.loadingAds,
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12.sp,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

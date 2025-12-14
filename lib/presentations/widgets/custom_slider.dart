@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 // Needed for DiagnosticableTreeMixin
 
 // 1. Custom Thumb Shape: White ring with a black center dot
-import 'package:flutter/material.dart';
 
 // NOTE: Assuming CustomTrackWithEndCaps and EndIconShape are defined elsewhere.
-import 'package:flutter/material.dart';
 
 class RoundSliderWithBorderThumb extends SliderComponentShape {
   final double thumbRadius;

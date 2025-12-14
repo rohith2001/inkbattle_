@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:inkbattle_frontend/constants/app_images.dart';
 import 'package:inkbattle_frontend/services/ad_service.dart';
-import 'package:inkbattle_frontend/utils/routes/routes.dart';
 import 'package:inkbattle_frontend/widgets/blue_background_scaffold.dart';
 import 'package:inkbattle_frontend/repositories/room_repository.dart';
 import 'package:inkbattle_frontend/repositories/theme_repository.dart';
@@ -14,7 +13,7 @@ import 'package:inkbattle_frontend/models/room_model.dart';
 import 'package:inkbattle_frontend/utils/lang.dart';
 
 class MultiplayerScreen extends StatefulWidget {
-  MultiplayerScreen({super.key, this.bannerAd});
+  const MultiplayerScreen({super.key, this.bannerAd});
   final BannerAd? bannerAd;
 
   @override
@@ -199,7 +198,16 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
         (roomListResponse) {
           if (mounted) {
             setState(() {
-              _rooms = roomListResponse.rooms ?? [];
+              final rooms = roomListResponse.rooms ?? [];
+              // Sort rooms by fill percentage (most filled first)
+              // Fill percentage = participantCount / maxPlayers
+              _rooms = rooms
+                ..sort((a, b) {
+                  final fillA = (a.participantCount ?? 0) / (a.maxPlayers ?? 1);
+                  final fillB = (b.participantCount ?? 0) / (b.maxPlayers ?? 1);
+                  // Sort in descending order (highest fill percentage first)
+                  return fillB.compareTo(fillA);
+                });
             });
           }
         },
@@ -365,249 +373,284 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = MediaQuery.of(context).size.width > 600;
     return BlueBackgroundScaffold(
       child: SafeArea(
-        child: Column(
-          children: [
-            // Back button
-            Padding(
-              padding: EdgeInsets.only(
-                  left: 8.w, top: 8.h, bottom: 16.h, right: 8.w),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Icon(
-                    Icons.arrow_back_ios,
-                    color: Colors.white,
-                    size: 24.sp,
+        bottom: false,
+        child: Center(
+          child: SizedBox(
+            width: isTablet ? 600 : MediaQuery.of(context).size.width,
+            child: Column(
+              children: [
+                // Back button
+                Padding(
+                  padding: EdgeInsets.only(
+                      left: isTablet ? 12.w : 8.w,
+                      top: isTablet ? 12.h : 8.h,
+                      bottom: isTablet ? 20.h : 16.h,
+                      right: isTablet ? 12.w : 8.w),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: GestureDetector(
+                      onTap: () => Navigator.pop(context),
+                      child: Icon(
+                        Icons.arrow_back_ios,
+                        color: Colors.white,
+                        size: isTablet ? 28.sp : 24.sp,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
 
-            // Filter Pills - Row 1
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.w),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildFilterPill(
-                      image: AppImages.global,
-                      icon: Icons.language,
-                      value: selectedLanguage,
-                      items: languages,
-                      onChanged: (val) {
-                        setState(() => selectedLanguage = val);
-                        print(selectedLanguage);
-                        _loadRooms();
-                      },
-                      hintText: "Language",
-                      iconColor: Colors.lightBlueAccent,
-                    ),
-                  ),
-                  SizedBox(width: 8.w),
-                  Expanded(
-                    child: _buildFilterPill(
-                      image: AppImages.language,
-                      icon: Icons.image,
-                      value: selectedScript,
-                      items: scripts,
-                      onChanged: (val) {
-                        setState(() => selectedScript = val);
-                        _loadRooms();
-                      },
-                      hintText: "Script",
-                      iconColor: Colors.deepPurpleAccent,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            SizedBox(height: 10.h),
-
-            // Filter Pills - Row 2
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.w),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildFilterPill(
-                      image: AppImages.country,
-                      icon: Icons.public,
-                      value: selectedCountry,
-                      items: countries,
-                      onChanged: (val) {
-                        setState(() => selectedCountry = val);
-                        _loadRooms();
-                      },
-                      hintText: "Country",
-                      iconColor: Colors.lightGreenAccent,
-                    ),
-                  ),
-                  SizedBox(width: 8.w),
-                  Expanded(
-                    child: _buildFilterPill(
-                      image: AppImages.coinStar,
-                      icon: Icons.star,
-                      value: selectedPoints,
-                      items: points,
-                      onChanged: (val) {
-                        setState(() => selectedPoints = val);
-                        _loadRooms();
-                      },
-                      hintText: "Points",
-                      iconColor: Colors.amber,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            SizedBox(height: 10.h),
-
-            // Filter Pills - Row 3
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.w),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildFilterPill(
-                      image: AppImages.category,
-                      icon: Icons.category,
-                      value: selectedCategory,
-                      items: categories,
-                      onChanged: (val) {
-                        setState(() => selectedCategory = val);
-                        _loadRooms();
-                      },
-                      hintText: "Category",
-                      iconColor: Colors.orange,
-                    ),
-                  ),
-                  SizedBox(width: 8.w),
-                  Expanded(
-                    child: _buildFilterPill(
-                      image: AppImages.game,
-                      icon: Icons.people,
-                      value: AppLocalizations.team,
-                      onChanged: null, // Make it unchangeable
-                      hintText: AppLocalizations.mode,
-                      items: [
-                        AppLocalizations.team,
-                      ],
-                      iconColor: Colors.blueAccent,
-                      isStatic: true, // Make it static/unchangeable
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            SizedBox(height: 16.h),
-
-            // Rooms Container
-            Expanded(
-              child: Container(
-                margin: EdgeInsets.symmetric(horizontal: 12.w),
-                padding: EdgeInsets.symmetric(vertical: 16.h, horizontal: 12.w),
-                decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                        begin: AlignmentGeometry.topCenter,
-                        end: AlignmentGeometry.bottomCenter,
-                        colors: [
-                          Color.fromARGB(255, 34, 52, 96),
-                          Color.fromARGB(
-                            255,
-                            17,
-                            29,
-                            63,
-                          ),
-                          Color.fromARGB(
-                            255,
-                            17,
-                            29,
-                            63,
-                          ),
-                          Color.fromARGB(
-                            255,
-                            17,
-                            29,
-                            63,
-                          ),
-                          Color.fromARGB(
-                            255,
-                            22,
-                            43,
-                            81,
-                          ),
-                        ]),
-                    borderRadius: BorderRadius.circular(20.r),
-                    border: Border.all(
-                        color: Color.fromARGB(255, 52, 91, 168), width: 1)),
-                child: allFilled
-                    ? _isLoading
-                        ? const Center(
-                            child:
-                                CircularProgressIndicator(color: Colors.white),
-                          )
-                        : _rooms.isEmpty
-                            ? Center(
-                                child: Text(
-                                  'No rooms available',
-                                  style: TextStyle(
-                                    color: Colors.white60,
-                                    fontSize: 16.sp,
-                                  ),
-                                ),
-                              )
-                            : ListView.separated(
-                                itemCount: _rooms.length,
-                                separatorBuilder: (_, __) =>
-                                    SizedBox(height: 16.h),
-                                itemBuilder: (context, index) {
-                                  final room = _rooms[index];
-                                  return _buildRoomCard(room);
-                                },
-                              )
-                    : Center(
-                        child: Text(
-                          'Select all filters to view rooms',
-                          style: TextStyle(
-                            color: Colors.white60,
-                            fontSize: 16.sp,
-                          ),
+                // Filter Pills - Row 1
+                Padding(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: isTablet ? 20.w : 16.w),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildFilterPill(
+                          image: AppImages.global,
+                          icon: Icons.language,
+                          value: selectedLanguage,
+                          items: languages,
+                          onChanged: (val) {
+                            setState(() => selectedLanguage = val);
+                            print(selectedLanguage);
+                            _loadRooms();
+                          },
+                          hintText: "Language",
+                          iconColor: Colors.lightBlueAccent,
+                          isTablet: isTablet,
                         ),
                       ),
-              ),
-            ),
-            SizedBox(height: 10.h),
-            // Banner Ad
-            if (_isBannerAdLoaded && _bannerAd != null)
-              Container(
-                width: double.infinity,
-                height: 60.h,
-                color: Colors.black.withOpacity(0.3),
-                child: AdWidget(ad: _bannerAd!),
-              )
-            else
-              Container(
-                width: double.infinity,
-                height: 60.h,
-                color: Colors.grey.withOpacity(0.2),
-                child: Center(
-                  child: Text(
-                    'Loading ads...',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12.sp,
-                    ),
+                      SizedBox(width: isTablet ? 12.w : 8.w),
+                      Expanded(
+                        child: _buildFilterPill(
+                          image: AppImages.language,
+                          icon: Icons.image,
+                          value: selectedScript,
+                          items: scripts,
+                          onChanged: (val) {
+                            setState(() => selectedScript = val);
+                            _loadRooms();
+                          },
+                          hintText: "Script",
+                          iconColor: Colors.deepPurpleAccent,
+                          isTablet: isTablet,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ),
-            SizedBox(height: 10.h),
-          ],
+
+                SizedBox(height: isTablet ? 12.h : 10.h),
+
+                // Filter Pills - Row 2
+                Padding(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: isTablet ? 20.w : 16.w),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildFilterPill(
+                          image: AppImages.country,
+                          icon: Icons.public,
+                          value: selectedCountry,
+                          items: countries,
+                          onChanged: (val) {
+                            setState(() => selectedCountry = val);
+                            _loadRooms();
+                          },
+                          hintText: "Country",
+                          iconColor: Colors.lightGreenAccent,
+                          isTablet: isTablet,
+                        ),
+                      ),
+                      SizedBox(width: isTablet ? 12.w : 8.w),
+                      Expanded(
+                        child: _buildFilterPill(
+                          image: AppImages.coinStar,
+                          icon: Icons.star,
+                          value: selectedPoints,
+                          items: points,
+                          onChanged: (val) {
+                            setState(() => selectedPoints = val);
+                            _loadRooms();
+                          },
+                          hintText: "Points",
+                          iconColor: Colors.amber,
+                          isTablet: isTablet,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: isTablet ? 12.h : 10.h),
+
+                // Filter Pills - Row 3
+                Padding(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: isTablet ? 20.w : 16.w),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _buildFilterPill(
+                          image: AppImages.category,
+                          icon: Icons.category,
+                          value: selectedCategory,
+                          items: categories,
+                          onChanged: (val) {
+                            setState(() => selectedCategory = val);
+                            _loadRooms();
+                          },
+                          hintText: "Category",
+                          iconColor: Colors.orange,
+                          isTablet: isTablet,
+                        ),
+                      ),
+                      SizedBox(width: isTablet ? 12.w : 8.w),
+                      Expanded(
+                        child: _buildFilterPill(
+                          image: AppImages.game,
+                          icon: Icons.people,
+                          value: selectedGameMode == "team_vs_team"
+                              ? AppLocalizations.team
+                              : AppLocalizations.individual,
+                          onChanged: (val) {
+                            if (val == AppLocalizations.team) {
+                              setState(() {
+                                selectedGameMode = "team_vs_team";
+                              });
+                            } else if (val == AppLocalizations.individual) {
+                              setState(() {
+                                selectedGameMode = "1v1";
+                              });
+                            }
+                            _loadRooms();
+                          },
+                          hintText: AppLocalizations.mode,
+                          items: [
+                            AppLocalizations.team,
+                            AppLocalizations.individual
+                          ],
+                          iconColor: Colors.blueAccent,
+                          isStatic: false, // Make it static/unchangeable
+                          isTablet: isTablet,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: isTablet ? 20.h : 16.h),
+
+                // Rooms Container
+                Expanded(
+                  child: Container(
+                    margin: EdgeInsets.symmetric(
+                        horizontal: isTablet ? 16.w : 12.w),
+                    padding: EdgeInsets.symmetric(
+                        vertical: isTablet ? 20.h : 16.h,
+                        horizontal: isTablet ? 16.w : 12.w),
+                    decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                            begin: AlignmentGeometry.topCenter,
+                            end: AlignmentGeometry.bottomCenter,
+                            colors: [
+                              Color.fromARGB(255, 34, 52, 96),
+                              Color.fromARGB(
+                                255,
+                                17,
+                                29,
+                                63,
+                              ),
+                              Color.fromARGB(
+                                255,
+                                17,
+                                29,
+                                63,
+                              ),
+                              Color.fromARGB(
+                                255,
+                                17,
+                                29,
+                                63,
+                              ),
+                              Color.fromARGB(
+                                255,
+                                22,
+                                43,
+                                81,
+                              ),
+                            ]),
+                        borderRadius: BorderRadius.circular(20.r),
+                        border: Border.all(
+                            color: const Color.fromARGB(255, 52, 91, 168), width: 1)),
+                    child: allFilled
+                        ? _isLoading
+                            ? const Center(
+                                child: CircularProgressIndicator(
+                                    color: Colors.white),
+                              )
+                            : _rooms.isEmpty
+                                ? Center(
+                                    child: Text(
+                                      'No rooms available',
+                                      style: TextStyle(
+                                        color: Colors.white60,
+                                        fontSize: 16.sp,
+                                      ),
+                                    ),
+                                  )
+                                : ListView.separated(
+                                    itemCount: _rooms.length,
+                                    separatorBuilder: (_, __) =>
+                                        SizedBox(height: 16.h),
+                                    itemBuilder: (context, index) {
+                                      final room = _rooms[index];
+                                      return _buildRoomCard(room);
+                                    },
+                                  )
+                        : Center(
+                            child: Text(
+                              'Select all filters to view rooms',
+                              style: TextStyle(
+                                color: Colors.white60,
+                                fontSize: 16.sp,
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+                SizedBox(height: isTablet ? 12.h : 10.h),
+                // Banner Ad
+                if (_isBannerAdLoaded && _bannerAd != null)
+                  Container(
+                    width: double.infinity,
+                    height: isTablet ? 70.h : 60.h,
+                    color: Colors.black.withOpacity(0.3),
+                    child: AdWidget(ad: _bannerAd!),
+                  )
+                else
+                  Container(
+                    width: double.infinity,
+                    height: isTablet ? 70.h : 60.h,
+                    color: Colors.grey.withOpacity(0.2),
+                    child: Center(
+                      child: Text(
+                        'Loading ads...',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: isTablet ? 14.sp : 12.sp,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -790,6 +833,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
         false, // If true, ignore dropdown logic and just execute onTap
     bool isToggle = false,
     String? image, // If true, ignore dropdown logic and just execute onTap
+    bool isTablet = false,
   }) {
     final GlobalKey tapKey = GlobalKey();
     final String displayValue = value ?? hintText;
@@ -798,11 +842,11 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
         !isStatic && !isToggle; // True if it should open a menu
 
     return Container(
-      height: 45.h,
+      height: isTablet ? 52.h : 45.h,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(25.r),
         // Use a subtle gradient/border for styling
-        border: Border.all(color: Colors.white, width: 1.w),
+        border: Border.all(color: Colors.white, width: isTablet ? 1.5.w : 1.w),
         color: const Color(0xFF0E0E0E),
       ),
       child: Material(
@@ -849,7 +893,9 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                   : onTap, // If it's a static/toggle button, execute the direct onTap
 
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
+            padding: EdgeInsets.symmetric(
+                horizontal: isTablet ? 14.w : 10.w,
+                vertical: isTablet ? 12.h : 10.h),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -857,10 +903,10 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                 if (image != null) ...[
                   Image.asset(
                     image,
-                    height: 18.h,
-                    width: 18.w,
+                    height: isTablet ? 22.h : 18.h,
+                    width: isTablet ? 22.w : 18.w,
                   ),
-                  SizedBox(width: 8.w),
+                  SizedBox(width: isTablet ? 10.w : 8.w),
                 ],
                 Expanded(
                   child: Text(
@@ -871,18 +917,18 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                     textAlign: TextAlign.left,
                     style: GoogleFonts.lato(
                       color: Colors.white,
-                      fontSize: 13.sp,
+                      fontSize: isTablet ? 15.sp : 13.sp,
                       fontWeight: FontWeight.w600,
                       height: 1.2,
                     ),
                   ),
                 ),
                 if (isDropdown) ...[
-                  SizedBox(width: 6.w),
+                  SizedBox(width: isTablet ? 8.w : 6.w),
                   Image.asset(
                     "asset/image/arrow_down.png",
-                    height: 14.sp,
-                    width: 14.sp,
+                    height: isTablet ? 16.sp : 14.sp,
+                    width: isTablet ? 16.sp : 14.sp,
                   ),
                 ],
               ],
@@ -989,8 +1035,8 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16.r),
           border: BoxBorder.fromLTRB(
-            bottom: BorderSide(
-              color: const Color.fromRGBO(31, 48, 96, 1),
+            bottom: const BorderSide(
+              color: Color.fromRGBO(31, 48, 96, 1),
               width: borderWidth,
             ),
           ),
@@ -1010,7 +1056,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                   colors: [gradientStartColor, gradientEndColor],
                 ),
               ),
-              padding: EdgeInsets.all(borderWidth), // Creates the border gap
+              padding: const EdgeInsets.all(borderWidth), // Creates the border gap
 
               // 2. Inner Container: Holds the original content
               child: Container(
@@ -1056,7 +1102,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                         ),
                         VerticalDivider(
                           width: 24.h,
-                          color: Color.fromRGBO(76, 99, 162, 1),
+                          color: const Color.fromRGBO(76, 99, 162, 1),
                         ),
                         (room.gameMode != null &&
                                 room.gameMode == 'team_vs_team')
@@ -1064,14 +1110,14 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                                 '👥vs👥',
                                 style: TextStyle(
                                   fontSize: 13.sp,
-                                  color: Color.fromRGBO(132, 156, 206, 1),
+                                  color: const Color.fromRGBO(132, 156, 206, 1),
                                 ),
                               )
                             : Text(
                                 '👤vs👤',
                                 style: TextStyle(
                                   fontSize: 13.sp,
-                                  color: Color.fromRGBO(132, 156, 206, 1),
+                                  color: const Color.fromRGBO(132, 156, 206, 1),
                                 ),
                               ),
                         SizedBox(
@@ -1081,12 +1127,12 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                           _getCountryFlag(room.country ?? 'India'),
                           style: TextStyle(fontSize: 16.sp),
                         ),
-                        Spacer(),
+                        const Spacer(),
                         if (room.voiceEnabled == true) ...[
                           SizedBox(height: 8.h),
                           Icon(
                             Icons.mic,
-                            color: Color.fromRGBO(132, 156, 206, 1),
+                            color: const Color.fromRGBO(132, 156, 206, 1),
                             size: 20.sp,
                           ),
                         ],
@@ -1100,25 +1146,25 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                     child: Row(
                       children: [
                         Icon(Icons.people,
-                            color: Color.fromRGBO(132, 156, 206, 1),
+                            color: const Color.fromRGBO(132, 156, 206, 1),
                             size: 14.sp),
                         SizedBox(width: 4.w),
                         Text(
                           '${room.participantCount}/${room.maxPlayers}',
                           style: TextStyle(
-                            color: Color.fromRGBO(132, 156, 206, 1),
+                            color: const Color.fromRGBO(132, 156, 206, 1),
                             fontSize: 13.sp,
                           ),
                         ),
                         SizedBox(width: 12.w),
                         Icon(Icons.star,
-                            color: Color.fromRGBO(132, 156, 206, 1),
+                            color: const Color.fromRGBO(132, 156, 206, 1),
                             size: 14.sp),
                         SizedBox(width: 4.w),
                         Text(
                           '${room.pointsTarget}',
                           style: TextStyle(
-                            color: Color.fromRGBO(132, 156, 206, 1),
+                            color: const Color.fromRGBO(132, 156, 206, 1),
                             fontSize: 13.sp,
                           ),
                         ),
@@ -1126,7 +1172,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                         _buildBadge(
                             room.language?.substring(0, 2).toUpperCase() ??
                                 'EN'),
-                        VerticalDivider(
+                        const VerticalDivider(
                             color: Color.fromRGBO(132, 156, 206, 1),
                             thickness: 1),
                         _buildBadge(
@@ -1151,7 +1197,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
       child: Text(
         text,
         style: TextStyle(
-          color: Color.fromRGBO(148, 175, 231, 1),
+          color: const Color.fromRGBO(148, 175, 231, 1),
           fontSize: 11.sp,
           fontWeight: FontWeight.w600,
         ),

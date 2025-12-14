@@ -176,7 +176,8 @@ class AppLocalizations {
       'select_your_team': 'Select Your Team',
       'team_a': 'Team A',
       'team_b': 'Team B',
-      'insufficient_coins_join': 'Insufficient coins! You need coins to join this room.',
+      'insufficient_coins_join':
+          'Insufficient coins! You need coins to join this room.',
       'failed_to_join_room': 'Failed to join room',
       'successfully_joined_room': 'Successfully joined room!',
       'wrong': 'Wrong',
@@ -210,12 +211,48 @@ class AppLocalizations {
       'only_drawer_can_send': 'Only the drawer can send these messages.',
       'message_label': 'Message :',
       'select': 'Select',
-      'answers_chat_instruction': "Type your answers here. If you're correct, it will be marked in green",
+      'answers_chat_instruction':
+          "Type your answers here. If you're correct, it will be marked in green",
       'correct_lower': 'correct',
       'type_answers_here': 'Type your answers here...',
       'correct_answer_party': 'Correct answer 🥳',
-      'general_chat_welcome': 'Welcome! This is your general \nchat area. Type below to start!',
+      'general_chat_welcome':
+          'Welcome! This is your general \nchat area. Type below to start!',
       'type_anything': 'Type anything...',
+
+      // Create Room & Join Room
+      'please_enter_room_name': 'Please enter a room name',
+      'failed_to_create_room': 'Failed to create room',
+      'code_copied_clipboard': 'Code copied to clipboard!',
+      'room_created': 'Room Created!',
+      'share_code_with_friends': 'Share this code with your friends:',
+      'enter_room': 'Enter Room',
+      'create_room_configure_lobby':
+          'Create a room and configure settings in the lobby',
+      'enter_room_name_hint': 'Enter room name',
+      'room_code_share_info':
+          "You'll be able to share the room code with friends after creation",
+      'create_team_room': 'Create Team Room',
+      'please_check_code': 'Please check the code and try again.',
+
+      // Random Match Screen
+      'random_match': 'Random Match',
+      'select_target_points': 'Select Target Points',
+      'play_random_coins': 'Play Random (250 Coins)',
+      'please_select_all_fields':
+          'Please select all fields including Target Points',
+      'failed_to_find_match': 'Failed to find match',
+      'watch_ads_coming_soon': 'Watch ads feature coming soon!',
+      'buy_coins_coming_soon': 'Buy coins feature coming soon!',
+      'insufficient_coins_title': 'Insufficient Coins',
+      'insufficient_coins_message':
+          "You don't have enough coins to join. Watch ads or buy coins to continue playing.",
+      'watch_ads': 'Watch Ads',
+      'buy_coins': 'Buy Coins',
+      'no_matches_found': 'No Matches Found',
+      'no_matches_message':
+          'No public rooms match your preferences. Try different settings or create a new room.',
+      'try_again': 'Try Again',
     },
     'hi': {
       // Guest Signup & Profile
@@ -371,6 +408,39 @@ class AppLocalizations {
       'usa': 'अमेरिका',
       'uk': 'यूके',
       'japan': 'जापान',
+
+      // Create Room & Join Room
+      'please_enter_room_name': 'कृपया रूम का नाम दर्ज करें',
+      'failed_to_create_room': 'रूम बनाने में विफल',
+      'code_copied_clipboard': 'कोड क्लिपबोर्ड पर कॉपी किया गया!',
+      'room_created': 'रूम बनाया गया!',
+      'share_code_with_friends': 'इस कोड को अपने दोस्तों के साथ साझा करें:',
+      'enter_room': 'रूम में प्रवेश करें',
+      'create_room_configure_lobby':
+          'एक रूम बनाएं और लॉबी में सेटिंग्स कॉन्फ़िगर करें',
+      'enter_room_name_hint': 'रूम का नाम दर्ज करें',
+      'room_code_share_info':
+          'आप रूम बनाने के बाद दोस्तों के साथ रूम कोड साझा कर सकेंगे',
+      'create_team_room': 'टीम रूम बनाएं',
+      'please_check_code': 'कृपया कोड जांचें और पुनः प्रयास करें।',
+
+      // Random Match Screen
+      'random_match': 'रैंडम मैच',
+      'select_target_points': 'लक्ष्य अंक चुनें',
+      'play_random_coins': 'रैंडम खेलें (250 सिक्के)',
+      'please_select_all_fields': 'कृपया लक्ष्य अंक सहित सभी फ़ील्ड चुनें',
+      'failed_to_find_match': 'मैच खोजने में विफल',
+      'watch_ads_coming_soon': 'विज्ञापन देखने की सुविधा जल्द आ रही है!',
+      'buy_coins_coming_soon': 'सिक्के खरीदने की सुविधा जल्द आ रही है!',
+      'insufficient_coins_title': 'अपर्याप्त सिक्के',
+      'insufficient_coins_message':
+          'आपके पास शामिल होने के लिए पर्याप्त सिक्के नहीं हैं। खेलना जारी रखने के लिए विज्ञापन देखें या सिक्के खरीदें।',
+      'watch_ads': 'विज्ञापन देखें',
+      'buy_coins': 'सिक्के खरीदें',
+      'no_matches_found': 'कोई मैच नहीं मिला',
+      'no_matches_message':
+          'कोई सार्वजनिक रूम आपकी प्राथमिकताओं से मेल नहीं खाता। विभिन्न सेटिंग्स आज़माएं या नया रूम बनाएं।',
+      'try_again': 'पुनः प्रयास करें',
     },
     'te': {
       // Guest Signup & Profile
@@ -526,6 +596,40 @@ class AppLocalizations {
       'usa': 'USA',
       'uk': 'UK',
       'japan': 'జపాన్',
+
+      // Create Room & Join Room
+      'please_enter_room_name': 'దయచేసి గది పేరును నమోదు చేయండి',
+      'failed_to_create_room': 'గది సృష్టించడం విఫలమైంది',
+      'code_copied_clipboard': 'కోడ్ క్లిప్‌బోర్డ్‌కి కాపీ చేయబడింది!',
+      'room_created': 'గది సృష్టించబడింది!',
+      'share_code_with_friends': 'ఈ కోడ్‌ని మీ స్నేహితులతో పంచుకోండి:',
+      'enter_room': 'గదిలోకి ప్రవేశించండి',
+      'create_room_configure_lobby':
+          'గదిని సృష్టించండి మరియు లాబీలో సెట్టింగ్‌లను కాన్ఫిగర్ చేయండి',
+      'enter_room_name_hint': 'గది పేరును నమోదు చేయండి',
+      'room_code_share_info':
+          'మీరు గది సృష్టించిన తర్వాత స్నేహితులతో గది కోడ్‌ను పంచుకోగలరు',
+      'create_team_room': 'టీమ్ గది సృష్టించండి',
+      'please_check_code': 'దయచేసి కోడ్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.',
+
+      // Random Match Screen
+      'random_match': 'రాండమ్ మ్యాచ్',
+      'select_target_points': 'లక్ష్య పాయింట్లను ఎంచుకోండి',
+      'play_random_coins': 'రాండమ్ ఆడండి (250 నాణేలు)',
+      'please_select_all_fields':
+          'దయచేసి లక్ష్య పాయింట్లతో సహా అన్ని ఫీల్డ్‌లను ఎంచుకోండి',
+      'failed_to_find_match': 'మ్యాచ్ కనుగొనడంలో విఫలమైంది',
+      'watch_ads_coming_soon': 'ప్రకటనలు చూసే ఫీచర్ త్వరలో వస్తోంది!',
+      'buy_coins_coming_soon': 'నాణేలు కొనుగోలు ఫీచర్ త్వరలో వస్తోంది!',
+      'insufficient_coins_title': 'తగినంత నాణేలు లేవు',
+      'insufficient_coins_message':
+          'మీకు చేరడానికి తగినంత నాణేలు లేవు. ఆటను కొనసాగించడానికి ప్రకటనలు చూడండి లేదా నాణేలు కొనండి।',
+      'watch_ads': 'ప్రకటనలు చూడండి',
+      'buy_coins': 'నాణేలు కొనండి',
+      'no_matches_found': 'మ్యాచ్‌లు కనుగొనబడలేదు',
+      'no_matches_message':
+          'మీ ప్రాధాన్యతలకు పబ్లిక్ గదులు సరిపోలలేదు। వేర్వేరు సెట్టింగ్‌లను ప్రయత్నించండి లేదా కొత్త గదిని సృష్టించండి.',
+      'try_again': 'మళ్లీ ప్రయత్నించండి',
     },
     'mr': {
       // Guest Signup & Profile
@@ -679,6 +783,39 @@ class AppLocalizations {
       'usa': 'अमेरिका',
       'uk': 'यूके',
       'japan': 'जपान',
+
+      // Create Room & Join Room
+      'please_enter_room_name': 'कृपया रूम चे नाव प्रविष्ट करा',
+      'failed_to_create_room': 'रूम तयार करण्यात अयशस्वी',
+      'code_copied_clipboard': 'कोड क्लिपबोर्डवर कॉपी केला!',
+      'room_created': 'रूम तयार झाला!',
+      'share_code_with_friends': 'हा कोड तुमच्या मित्रांसह शेअर करा:',
+      'enter_room': 'रूममध्ये प्रवेश करा',
+      'create_room_configure_lobby':
+          'एक रूम तयार करा आणि लॉबीमध्ये सेटिंग्ज कॉन्फिगर करा',
+      'enter_room_name_hint': 'रूम चे नाव प्रविष्ट करा',
+      'room_code_share_info':
+          'तुम्ही रूम तयार केल्यानंतर मित्रांसह रूम कोड शेअर करू शकता',
+      'create_team_room': 'टीम रूम तयार करा',
+      'please_check_code': 'कृपया कोड तपासा आणि पुन्हा प्रयत्न करा.',
+
+      // Random Match Screen
+      'random_match': 'रँडम मॅच',
+      'select_target_points': 'लक्ष्य गुण निवडा',
+      'play_random_coins': 'रँडम खेळा (250 नाणी)',
+      'please_select_all_fields': 'कृपया लक्ष्य गुणांसह सर्व फील्ड निवडा',
+      'failed_to_find_match': 'मॅच शोधण्यात अयशस्वी',
+      'watch_ads_coming_soon': 'जाहिराती पहाण्याचे वैशिष्ट्य लवकरच येत आहे!',
+      'buy_coins_coming_soon': 'नाणी खरेदी करण्याचे वैशिष्ट्य लवकरच येत आहे!',
+      'insufficient_coins_title': 'अपुरी नाणी',
+      'insufficient_coins_message':
+          'तुमच्याकडे सामील होण्यासाठी पुरेसी नाणी नाहीत। खेळणे सुरू ठेवण्यासाठी जाहिराती पहा किंवा नाणी खरेदी करा।',
+      'watch_ads': 'जाहिराती पहा',
+      'buy_coins': 'नाणी खरेदी करा',
+      'no_matches_found': 'कोणतीही मॅच सापडली नाही',
+      'no_matches_message':
+          'तुमच्या प्राधान्यांशी कोणतीही सार्वजनिक खोली जुळली नाही। भिन्न सेटिंग्ज प्रयत्न करा किंवा नवीन खोली तयार करा।',
+      'try_again': 'पुन्हा प्रयत्न करा',
     },
     'km': {
       // Guest Signup & Profile
@@ -825,17 +962,54 @@ class AppLocalizations {
       // Languages
       'hindi': 'ಹಿಂದಿ',
       'telugu': 'ತೆಲುಗು',
-      'english': 'ಇಂಗ್ಲೀಷ್',
+      'english': 'ಇಂಗ್ಲೀಷ್',
 
       // Countries
       'india': 'ಭಾರತ',
       'usa': 'ಯುನೈಟೆಡ್ ಸ್ಟೇಟ್ಸ್',
       'uk': 'ಯುಕೆ',
       'japan': 'ಜಪಾನ್',
+
+      // Create Room & Join Room
+      'please_enter_room_name': 'ದಯವಿಟ್ಟು ಕೊಂಡಿ ಹೆಸರು ನಮೂದಿಸಿ',
+      'failed_to_create_room': 'ಕೊಂಡಿ ರಚಿಸಲು ವಿಫಲವಾಯಿತು',
+      'code_copied_clipboard': 'ಕೋಡ್ ಕ್ಲಿಪ್‌ಬೋರ್ಡ್‌ಗೆ ಕಾಪಿ ಮಾಡಲಾಗಿದೆ!',
+      'room_created': 'ಕೊಂಡಿ ರಚಿಸಲಾಗಿದೆ!',
+      'share_code_with_friends': 'ಈ ಕೋಡ್‌ನ್ನು ನಿಮ್ಮ ಸ್ನೇಹಿತರಿಗೆ ಹಂಚಿಕೊಂಡಿ:',
+      'enter_room': 'ಕೊಂಡಿಗೆ ಪ್ರವೇಶಿಸಿ',
+      'create_room_configure_lobby':
+          'ಕೊಂಡಿನ್ನು ರಚಿಸಿ ಮತ್ತು ಲಾಬಿಯಲ್ಲಿ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಕಾನ್ಫಿಗರ್ ಮಾಡಿ',
+      'enter_room_name_hint': 'ಕೊಂಡಿ ಹೆಸರು ನಮೂದಿಸಿ',
+      'room_code_share_info':
+          'ನೀವು ಕೊಂಡಿ ರಚಿಸಿದ ತರ್ವಾತ ಸ್ನೇಹಿತರಿಗೆ ಕೊಂಡಿ ಕೋಡ್‌ನ್ನು ಹಂಚಿಕೊಳ್ಳಲು ಸಾಧ್ಯ',
+      'create_team_room': 'ಟೀಮ್ ಕೊಂಡಿ ರಚಿಸಿ',
+      'please_check_code':
+          'ದಯವಿಟ್ಟು ಕೋಡ್‌ನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+
+      // Random Match Screen
+      'random_match': 'ಯಾದೃಚ್ಛಿಕ ಮ್ಯಾಚ್',
+      'select_target_points': 'ಗುರಿ ಅಂಕಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ',
+      'play_random_coins': 'ಯಾದೃಚ್ಛಿಕ ಆಡಿ (250 ನಾಣ್ಯಗಳು)',
+      'please_select_all_fields':
+          'ದಯವಿಟ್ಟು ಗುರಿ ಅಂಕಗಳೊಂದಿಗೆ ಎಲ್ಲಾ ಕ್ಷೇತ್ರಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ',
+      'failed_to_find_match': 'ಮ್ಯಾಚ್ ಹುಡುಕಲು ವಿಫಲವಾಗಿದೆ',
+      'watch_ads_coming_soon':
+          'ಜಾಹೀರಾತುಗಳನ್ನು ವೀಕ್ಷಿಸುವ ವೈಶಿಷ್ಟ್ಯ ಶೀಘ್ರದಲ್ಲೇ ಬರಲಿದೆ!',
+      'buy_coins_coming_soon':
+          'ನಾಣ್ಯಗಳನ್ನು ಖರೀದಿಸುವ ವೈಶಿಷ್ಟ್ಯ ಶೀಘ್ರದಲ್ಲೇ ಬರಲಿದೆ!',
+      'insufficient_coins_title': 'ಸಾಕಷ್ಟು ನಾಣ್ಯಗಳಿಲ್ಲ',
+      'insufficient_coins_message':
+          'ನೀವು ಸೇರಲು ಸಾಕಷ್ಟು ನಾಣ್ಯಗಳನ್ನು ಹೊಂದಿಲ್ಲ। ಆಟವನ್ನು ಮುಂದುವರಿಸಲು ಜಾಹೀರಾತುಗಳನ್ನು ವೀಕ್ಷಿಸಿ ಅಥವಾ ನಾಣ್ಯಗಳನ್ನು ಖರೀದಿಸಿ।',
+      'watch_ads': 'ಜಾಹೀರಾತುಗಳನ್ನು ವೀಕ್ಷಿಸಿ',
+      'buy_coins': 'ನಾಣ್ಯಗಳನ್ನು ಖರೀದಿಸಿ',
+      'no_matches_found': 'ಯಾವುದೇ ಮ್ಯಾಚ್‌ಗಳು ಕಂಡುಬಂದಿಲ್ಲ',
+      'no_matches_message':
+          'ನಿಮ್ಮ ಆದ್ಯತೆಗಳಿಗೆ ಯಾವುದೇ ಸಾರ್ವಜನಿಕ ಕೊಠಡಿಗಳು ಹೊಂದಿಕೆಯಾಗುತ್ತಿಲ್ಲ। ವಿಭಿನ್ನ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಪ್ರಯತ್ನಿಸಿ ಅಥವಾ ಹೊಸ ಕೊಠಡಿಯನ್ನು ರಚಿಸಿ.',
+      'try_again': 'ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ',
     },
     'ml': {
       // Guest Signup & Profile
-      'enter_username': 'ഉപയോക്തൃനാമം നൽകുക',
+      'enter_username': 'ಉಪയോക്തൃനാമം നൽകുക',
       'language': 'ഭാഷ',
       'country': 'രാജ്യം',
       'save': 'രക്ഷിക്കും',
@@ -2682,7 +2856,8 @@ class AppLocalizations {
 
   static String get usernameRequired => translate('username_required');
   static String get googleSignInFailed => translate('google_sign_in_failed');
-  static String get facebookSignInFailed => translate('facebook_sign_in_failed');
+  static String get facebookSignInFailed =>
+      translate('facebook_sign_in_failed');
   static String get signInError => translate('sign_in_error');
   static String get wordTheme => translate('word_theme');
   static String get wordScript => translate('word_script');
@@ -2690,15 +2865,18 @@ class AppLocalizations {
   static String get voice => translate('voice');
   static String get public => translate('public');
   static String get copied => translate('copied');
-  static String get pleaseFillAllDetails => translate('please_fill_all_details');
+  static String get pleaseFillAllDetails =>
+      translate('please_fill_all_details');
   static String get letsGoRoomLive => translate('lets_go_room_live');
   static String get enterRoomCode => translate('enter_room_code');
   static String get selectYourTeam => translate('select_your_team');
   static String get teamA => translate('team_a');
   static String get teamB => translate('team_b');
-  static String get insufficientCoinsJoin => translate('insufficient_coins_join');
+  static String get insufficientCoinsJoin =>
+      translate('insufficient_coins_join');
   static String get failedToJoinRoom => translate('failed_to_join_room');
-  static String get successfullyJoinedRoom => translate('successfully_joined_room');
+  static String get successfullyJoinedRoom =>
+      translate('successfully_joined_room');
   static String get wrong => translate('wrong');
   static String get breakWord => translate('break_word');
   static String get alternate => translate('alternate');
@@ -2730,10 +2908,45 @@ class AppLocalizations {
   static String get onlyDrawerCanSend => translate('only_drawer_can_send');
   static String get messageLabel => translate('message_label');
   static String get select => translate('select');
-  static String get answersChatInstruction => translate('answers_chat_instruction');
+  static String get answersChatInstruction =>
+      translate('answers_chat_instruction');
   static String get correctLower => translate('correct_lower');
   static String get typeAnswersHere => translate('type_answers_here');
   static String get correctAnswerParty => translate('correct_answer_party');
   static String get generalChatWelcome => translate('general_chat_welcome');
   static String get typeAnything => translate('type_anything');
+
+  // Create Room & Join Room
+  static String get pleaseEnterRoomName => translate('please_enter_room_name');
+  static String get failedToCreateRoom => translate('failed_to_create_room');
+  static String get codeCopiedClipboard => translate('code_copied_clipboard');
+  static String get roomCreated => translate('room_created');
+  static String get shareCodeWithFriends =>
+      translate('share_code_with_friends');
+  static String get enterRoom => translate('enter_room');
+  static String get createRoomConfigureLobby =>
+      translate('create_room_configure_lobby');
+  static String get enterRoomNameHint => translate('enter_room_name_hint');
+  static String get roomCodeShareInfo => translate('room_code_share_info');
+  static String get createTeamRoom => translate('create_team_room');
+  static String get pleaseCheckCode => translate('please_check_code');
+
+  // Random Match Screen
+  static String get randomMatch => translate('random_match');
+  static String get selectTargetPoints => translate('select_target_points');
+  static String get playRandomCoins => translate('play_random_coins');
+  static String get pleaseSelectAllFields =>
+      translate('please_select_all_fields');
+  static String get failedToFindMatch => translate('failed_to_find_match');
+  static String get watchAdsComingSoon => translate('watch_ads_coming_soon');
+  static String get buyCoinsComingSoon => translate('buy_coins_coming_soon');
+  static String get insufficientCoinsTitle =>
+      translate('insufficient_coins_title');
+  static String get insufficientCoinsMessage =>
+      translate('insufficient_coins_message');
+  static String get watchAds => translate('watch_ads');
+  static String get buyCoins => translate('buy_coins');
+  static String get noMatchesFound => translate('no_matches_found');
+  static String get noMatchesMessage => translate('no_matches_message');
+  static String get tryAgain => translate('try_again');
 }

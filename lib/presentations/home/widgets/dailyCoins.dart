@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:inkbattle_frontend/constants/app_images.dart';
 import 'package:inkbattle_frontend/repositories/user_repository.dart';
 import 'package:inkbattle_frontend/widgets/video_reward_dialog.dart';
+import 'package:video_player/video_player.dart';
 
 class DailyCoinsPopup extends StatefulWidget {
   final Function(dynamic)? onClaimed;
@@ -20,13 +21,36 @@ class _DailyCoinsPopupState extends State<DailyCoinsPopup> {
   bool _isLoading = true;
   bool _canClaim = false;
   int _hoursRemaining = 0;
-  int _coinsToAward = 100;
+  int _coinsToAward = 1000;
   bool _claimed = false;
+  VideoPlayerController? _videoController;
+  bool _isVideoInitialized = false;
 
   @override
   void initState() {
     super.initState();
     _checkDailyBonusStatus();
+    _initializeVideo();
+  }
+
+  Future<void> _initializeVideo() async {
+    _videoController = VideoPlayerController.asset(
+      AppImages.treasureBoxVideo,
+    );
+    await _videoController!.initialize();
+    _videoController!.setLooping(true);
+    _videoController!.play();
+    if (mounted) {
+      setState(() {
+        _isVideoInitialized = true;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _videoController?.dispose();
+    super.dispose();
   }
 
   Future<void> _checkDailyBonusStatus() async {
@@ -73,7 +97,7 @@ class _DailyCoinsPopupState extends State<DailyCoinsPopup> {
       },
       (data) {
         if (mounted) {
-          final coinsAwarded = data['coinsAwarded'] ?? 100;
+          const coinsAwarded = 1000;
           _coinsToAward = coinsAwarded;
           _claimed = true;
           // widget.onClaimed?.call(coinsAwarded);
@@ -126,12 +150,22 @@ class _DailyCoinsPopupState extends State<DailyCoinsPopup> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Image.asset(
-                  AppImages.dailycoinsbox,
-                  width: isTablet ? 200.w : 160.w,
-                  height: isTablet ? 250.h : 220.h,
-                  fit: BoxFit.contain,
-                ),
+                _isVideoInitialized && _videoController != null
+                    ? SizedBox(
+                        width: isTablet ? 200.w : 160.w,
+                        height: isTablet ? 250.h : 220.h,
+                        child: AspectRatio(
+                          aspectRatio: _videoController!.value.aspectRatio,
+                          child: VideoPlayer(_videoController!),
+                        ),
+                      )
+                    : SizedBox(
+                        width: isTablet ? 200.w : 160.w,
+                        height: isTablet ? 250.h : 220.h,
+                        child: const Center(
+                          child: CircularProgressIndicator(color: Colors.blue),
+                        ),
+                      ),
                 SizedBox(height: 16.h),
                 if (_claimed) ...[
                   Text(
@@ -163,7 +197,7 @@ class _DailyCoinsPopupState extends State<DailyCoinsPopup> {
                     ),
                   ),
                   Text(
-                    "100 COINS!",
+                    "1000 COINS!",
                     textAlign: TextAlign.center,
                     style: GoogleFonts.luckiestGuy(
                       fontSize: isTablet ? 25.sp : 24.sp,

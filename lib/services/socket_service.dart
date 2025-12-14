@@ -3,7 +3,7 @@ import 'dart:developer';
 import 'dart:async'; // Import for Completer
 import 'package:inkbattle_frontend/config/environment.dart';
 
-import '../widgets/drawing_canvas.dart';
+
 
 class SocketService {
   static final SocketService _instance = SocketService._internal();
@@ -234,6 +234,9 @@ class SocketService {
   void onSkipTurn(Function(dynamic) callback) {
     _socket?.on('skip_turn', callback);
   }
+  void onPlayerRemoved(Function(dynamic) callback){
+    _socket?.on('player_removed',callback);
+  }
 
   void onLobbyTimeExceeded(Function(dynamic) callback) {
     /*{
@@ -291,13 +294,11 @@ class SocketService {
   }
 
   void sendCanvasData(String roomCode, String targetSocketId,
-      List<DrawingPoint> history, double remainingTime) {
-    final List<Map<String, dynamic>> historyJson =
-        history.map((point) => point.toJson()).toList();
+      List<Map<String, dynamic>> history, double remainingTime) {
     _socket?.emit('send_canvas_data', {
       'roomCode': roomCode,
       'targetSocketId': targetSocketId,
-      'history': historyJson,
+      'history': history,
       'remainingTime': remainingTime
     });
   }

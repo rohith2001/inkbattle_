@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:inkbattle_frontend/services/ad_service.dart';
 import 'package:toastification/toastification.dart';
-import 'firebase_options.dart';
+
 import 'constants/bloc_provider.dart';
 import 'package:inkbattle_frontend/utils/preferences/local_preferences.dart';
 import 'package:inkbattle_frontend/utils/routes/routes.dart';
@@ -29,9 +29,7 @@ void main() async {
     // .env file not found, will use default values from Environment class
     print("Warning: .env file not found, using default values");
   }
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp();
   await AdService.initializeMobileAds();
   Bloc.observer = MyBlocObserver();
   usePathUrlStrategy();
@@ -50,7 +48,7 @@ void main() async {
   runApp(
     MultiBlocProvider(
       providers: blocProviders,
-      child: MyApp(),
+      child: const MyApp(),
     ),
   );
 }
@@ -87,7 +85,7 @@ void main() async {
 // }
 
 class MyApp extends StatefulWidget {
-  MyApp({super.key});
+  const MyApp({super.key});
 
   @override
   State<MyApp> createState() => _MyAppState();

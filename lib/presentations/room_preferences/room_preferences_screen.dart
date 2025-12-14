@@ -163,8 +163,8 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
         selectedCategory == null ||
         selectedTargetPoints == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select all fields including Target Points'),
+        SnackBar(
+          content: Text(AppLocalizations.pleaseSelectAllFields),
           backgroundColor: Colors.orange,
         ),
       );
@@ -198,7 +198,8 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('Failed to find match: ${failure.message}'),
+                  content: Text(
+                      '${AppLocalizations.failedToFindMatch}: ${failure.message}'),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -247,14 +248,13 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
           borderRadius: BorderRadius.circular(20.r),
         ),
         title: TextWidget(
-          text: "Insufficient Coins",
+          text: AppLocalizations.insufficientCoinsTitle,
           fontSize: 18.sp,
           fontWeight: FontWeight.bold,
           color: AppColors.whiteColor,
         ),
         content: TextWidget(
-          text:
-              "You don't have enough coins to join. Watch ads or buy coins to continue playing.",
+          text: AppLocalizations.insufficientCoinsMessage,
           fontSize: 14.sp,
           color: Colors.grey,
         ),
@@ -262,7 +262,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: TextWidget(
-              text: "Cancel",
+              text: AppLocalizations.cancel,
               fontSize: 14.sp,
               color: Colors.grey,
             ),
@@ -272,11 +272,11 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
               Navigator.pop(context);
               // TODO: Navigate to watch ads screen
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Watch ads feature coming soon!')),
+                SnackBar(content: Text(AppLocalizations.watchAdsComingSoon)),
               );
             },
             child: TextWidget(
-              text: "Watch Ads",
+              text: AppLocalizations.watchAds,
               fontSize: 14.sp,
               color: Colors.orange,
             ),
@@ -286,11 +286,11 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
               Navigator.pop(context);
               // TODO: Navigate to buy coins screen
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Buy coins feature coming soon!')),
+                SnackBar(content: Text(AppLocalizations.buyCoinsComingSoon)),
               );
             },
             child: TextWidget(
-              text: "Buy Coins",
+              text: AppLocalizations.buyCoins,
               fontSize: 14.sp,
               color: Colors.green,
             ),
@@ -309,14 +309,13 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
           borderRadius: BorderRadius.circular(20.r),
         ),
         title: TextWidget(
-          text: "No Matches Found",
+          text: AppLocalizations.noMatchesFound,
           fontSize: 18.sp,
           fontWeight: FontWeight.bold,
           color: AppColors.whiteColor,
         ),
         content: TextWidget(
-          text:
-              "No public rooms match your preferences. Try different settings or create a new room.",
+          text: AppLocalizations.noMatchesMessage,
           fontSize: 14.sp,
           color: Colors.grey,
         ),
@@ -324,7 +323,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: TextWidget(
-              text: "Try Again",
+              text: AppLocalizations.tryAgain,
               fontSize: 14.sp,
               color: Colors.blue,
             ),
@@ -423,7 +422,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
                   ),
                   SizedBox(width: 15.w),
                   TextWidget(
-                    text: "Random Match",
+                    text: AppLocalizations.randomMatch,
                     fontSize: 20.sp,
                     fontWeight: FontWeight.bold,
                     color: AppColors.whiteColor,
@@ -440,7 +439,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
                       // Language
                       _buildDropdown(
                         width: controlWidth,
-                        hint: "Select Language",
+                        hint: AppLocalizations.selectLanguage,
                         value: selectedLanguage,
                         items: languages,
                         imageurl: AppImages.mp1,
@@ -451,7 +450,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
                       // Country
                       _buildDropdown(
                         width: controlWidth,
-                        hint: "Select Country",
+                        hint: AppLocalizations.country,
                         value: selectedCountry,
                         items: countries,
                         imageurl: AppImages.mp4,
@@ -462,7 +461,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
                       // Category
                       _buildDropdown(
                         width: controlWidth,
-                        hint: "Select Category",
+                        hint: AppLocalizations.selectCategory,
                         value: selectedCategory,
                         items: categories,
                         imageurl: AppImages.mp5,
@@ -473,7 +472,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
                       // Target Points
                       _buildDropdown(
                         width: controlWidth,
-                        hint: "Select Target Points",
+                        hint: AppLocalizations.selectTargetPoints,
                         value: selectedTargetPoints?.toString(),
                         items: targetPoints.map((e) => e.toString()).toList(),
                         imageurl: AppImages.mp3,
@@ -555,7 +554,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
         child: _isLoading
             ? const CircularProgressIndicator(color: Colors.white)
             : TextWidget(
-                text: "Play Random (250 Coins)",
+                text: AppLocalizations.playRandomCoins,
                 fontSize: 16.sp,
                 fontWeight: FontWeight.bold,
                 color: AppColors.whiteColor,
@@ -683,7 +682,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
                   imageurl,
                   width: 24.w,
                   height: 24.h,
-                  color: isFilled ? null : Colors.grey,
+                  color: Colors.white,
                 ),
                 SizedBox(width: 12.w),
                 Expanded(

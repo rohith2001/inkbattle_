@@ -29,7 +29,6 @@ class RoundAnnouncementManager {
     clearSequence();
 
     final overlay = Overlay.of(context);
-    if (overlay == null) return;
     print(isTimeUp);
     if (isTimeUp!) {
       overlay.insert(overlay1!);
@@ -42,7 +41,7 @@ class RoundAnnouncementManager {
         clearSequence();
         return;
       }
-      if (isTimeUp!) {
+      if (isTimeUp) {
         _removeOverlay(overlay1);
       }
 

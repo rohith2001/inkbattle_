@@ -105,7 +105,7 @@ class _PrivacySafetyScreenState extends State<PrivacySafetyScreen> {
                         SizedBox(height: 15.h),
                         Expanded(
                           child: SingleChildScrollView(
-                            physics: AlwaysScrollableScrollPhysics(),
+                            physics: const AlwaysScrollableScrollPhysics(),
                             child: Padding(
                               padding: const EdgeInsets.all(20),
                               child: Column(

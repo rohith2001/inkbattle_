@@ -323,219 +323,261 @@ class _GuestSignUpScreenState extends State<GuestSignUpScreen>
   }
 
   Widget _buildFirstPage() {
-    double size = 0.15.sw;
-    List<Widget> _avatars = List.generate(5, (index) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isTablet = screenWidth > 600;
+    double contentWidth = isTablet ? 600 : screenWidth;
+    double size = isTablet ? contentWidth * 0.12 : contentWidth * 0.15;
+    List<Widget> avatars = List.generate(5, (index) {
       return Container();
     });
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 0.w, vertical: 10.h),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            const CoinContainer(coins: 0),
-            SizedBox(height: 0.15.sh),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 0.w),
-              child: Column(
-                children: [
-                  Stack(
-                    alignment: Alignment.center,
+      child: Center(
+        child: SizedBox(
+          width: contentWidth,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                const CoinContainer(coins: 0),
+                SizedBox(height: isTablet ? 0.1.sh : 0.15.sh),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 0.w),
+                  child: Column(
                     children: [
-                      // Main Profile Avatar
-                      Container(
-                        key: _centerAvatarKey,
-                        child: GestureDetector(
-                          onTap: _toggleAvatarSelection,
-                          child: Container(
-                            clipBehavior: Clip.hardEdge,
-                            height: 150.h,
-                            width: 150.w,
-                            padding: EdgeInsets.all(2.w),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF09BDFF),
-                                  Color(0xFF6FE4FF),
-                                  Color(0xFFFFFFFF),
-                                ],
-                              ),
-                            ),
-                            child: Container(
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.black,
-                              ),
-                              child: ClipOval(
-                                clipBehavior: Clip.hardEdge,
-                                child: SizedBox(
-                                  width: 140.r,
-                                  height: 140.r,
-                                  child: selectedProfilePhoto != null
-                                      ? Padding(
-                                          padding: const EdgeInsets.all(20.0),
-                                          child: Image.asset(
-                                            selectedProfilePhoto!,
-                                            fit: BoxFit.contain,
-
-                                          ),
-                                        )
-                                      : Center(
-                                          child: Icon(Icons.person,
-                                              size: 50.sp, color: Colors.grey),
-                                        ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      if (!showAvatarSelection)
-                        Positioned(
-                          bottom: 20.h,
-                          right: 0.w,
-                          child: GestureDetector(
-                            onTap: _toggleAvatarSelection,
-                            child: Container(
-                              height: 40.h,
-                              width: 40.w,
-                              decoration: const BoxDecoration(
-                                color: Color.fromRGBO(217, 217, 217, 1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Image.asset(
-                                AppImages.pencil,
-                                height: 30.h,
-                                width: 30.w,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                      // Avatar Selection Options
-                      if (showAvatarSelection)
-                        _buildAvatarSelectionStack(_avatars, size),
-
-                      // Moving Avatar Animation
-                      if (_movingAvatarIndex != null)
-                        _buildMovingAvatar(_movingAvatarIndex!),
-                    ],
-                  ),
-                  SizedBox(height: 0.07.sh),
-                  SizedBox(
-                    width: 0.6.sw,
-                    child: TextformFieldWidget(
-                      readOnly: false,
-                      controller: _usernameController,
-                      focusNode: _usernameFocusNode,
-                      height: 48.h,
-                      rouneded: 15.r,
-                      fontSize: 18.sp,
-                      hintTextColor: const Color.fromRGBO(255, 255, 255, 0.52),
-                      hintText: AppLocalizations.enterUsername,
-                      prefixIcon: Padding(
-                        padding: EdgeInsets.all(10.w),
-                        child: CustomSvgImage(
-                          imageUrl: AppImages.userSvg,
-                          height: 21.h,
-                          width: 21.w,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 0.03.sh),
-                  SizedBox(
-                    width: 0.6.sw,
-                    child: _buildGradientDropdown(
-                      hint: AppLocalizations.language,
-                      value: selectedLanguage,
-                      items: languages,
-                      prefixIcon: Padding(
-                        padding: EdgeInsets.all(12.w),
-                        child: CustomSvgImage(
-                          imageUrl: AppImages.languageSvg,
-                          height: 21.h,
-                          width: 21.w,
-                        ),
-                      ),
-                      onChanged: (val) => _changeLanguage(val),
-                    ),
-                  ),
-                  SizedBox(height: 0.03.sh),
-                  SizedBox(
-                    width: 0.6.sw,
-                    child: _buildGradientDropdown(
-                      hint: AppLocalizations.country,
-                      value: selectedCountry,
-                      items: countries,
-                      prefixIcon: Padding(
-                        padding: EdgeInsets.all(12.w),
-                        child: CustomSvgImage(
-                          imageUrl: AppImages.coutrySvg,
-                          height: 21.h,
-                          width: 21.w,
-                        ),
-                      ),
-                      onChanged: (val) {
-                        setState(() => selectedCountry = val);
-                        // Trigger rebuild to update button state
-                        if (mounted) setState(() {});
-                      },
-                    ),
-                  ),
-                  SizedBox(height: 25.h),
-                  InkWell(
-                    onTap: (_isSubmitting || !_areAllFieldsFilled())
-                        ? null
-                        : _handleGuestSignup,
-                    child: Opacity(
-                      opacity:
-                          (_isSubmitting || !_areAllFieldsFilled()) ? 0.5 : 1.0,
-                      child: Row(
+                      Stack(
+                        alignment: Alignment.center,
                         children: [
-                          const Spacer(),
-                          _isSubmitting
-                              ? SizedBox(
-                                  width: 18.sp,
-                                  height: 18.sp,
-                                  child: const CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
+                          // Main Profile Avatar
+                          Container(
+                            key: _centerAvatarKey,
+                            child: GestureDetector(
+                              onTap: _toggleAvatarSelection,
+                              child: Container(
+                                clipBehavior: Clip.hardEdge,
+                                height: isTablet ? 180.h : 150.h,
+                                width: isTablet ? 180.w : 150.w,
+                                padding: EdgeInsets.all(2.w),
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Color(0xFF09BDFF),
+                                      Color(0xFF6FE4FF),
+                                      Color(0xFFFFFFFF),
+                                    ],
                                   ),
-                                )
-                              : TextWidget(
-                                  text: AppLocalizations.next,
-                                  fontSize: 18.sp,
-                                  color: AppColors.whiteColor,
                                 ),
-                          Icon(Icons.navigate_next_outlined,
-                              color: AppColors.whiteColor, size: 22.sp),
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.black,
+                                  ),
+                                  child: ClipOval(
+                                    clipBehavior: Clip.hardEdge,
+                                    child: SizedBox(
+                                      width: isTablet ? 170.r : 140.r,
+                                      height: isTablet ? 170.r : 140.r,
+                                      child: selectedProfilePhoto != null
+                                          ? Padding(
+                                              padding: EdgeInsets.all(
+                                                  isTablet ? 30.0 : 20.0),
+                                              child: Image.asset(
+                                                selectedProfilePhoto!,
+                                                fit: BoxFit.contain,
+                                              ),
+                                            )
+                                          : Center(
+                                              child: Icon(Icons.person,
+                                                  size:
+                                                      isTablet ? 60.sp : 50.sp,
+                                                  color: Colors.grey),
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          if (!showAvatarSelection)
+                            Positioned(
+                              bottom: isTablet ? 25.h : 20.h,
+                              right: 0.w,
+                              child: GestureDetector(
+                                onTap: _toggleAvatarSelection,
+                                child: Container(
+                                  height: isTablet ? 50.h : 40.h,
+                                  width: isTablet ? 50.w : 40.w,
+                                  decoration: const BoxDecoration(
+                                    color: Color.fromRGBO(217, 217, 217, 1),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Image.asset(
+                                    AppImages.pencil,
+                                    height: isTablet ? 35.h : 30.h,
+                                    width: isTablet ? 35.w : 30.w,
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                          // Avatar Selection Options
+                          if (showAvatarSelection)
+                            _buildAvatarSelectionStack(
+                                avatars, size, contentWidth, isTablet),
+
+                          // Moving Avatar Animation
+                          if (_movingAvatarIndex != null)
+                            _buildMovingAvatar(
+                                _movingAvatarIndex!, contentWidth, isTablet),
                         ],
                       ),
-                    ),
+                      SizedBox(height: isTablet ? 0.05.sh : 0.07.sh),
+                      SizedBox(
+                        width:
+                            isTablet ? contentWidth * 0.5 : contentWidth * 0.6,
+                        child: TextformFieldWidget(
+                          readOnly: false,
+                          controller: _usernameController,
+                          focusNode: _usernameFocusNode,
+                          height: isTablet ? 55.h : 48.h,
+                          rouneded: 15.r,
+                          fontSize: isTablet ? 20.sp : 18.sp,
+                          hintTextColor:
+                              const Color.fromRGBO(255, 255, 255, 0.52),
+                          hintText: AppLocalizations.enterUsername,
+                          prefixIcon: Padding(
+                            padding: EdgeInsets.all(10.w),
+                            child: CustomSvgImage(
+                              imageUrl: AppImages.userSvg,
+                              height: isTablet ? 24.h : 21.h,
+                              width: isTablet ? 24.w : 21.w,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: isTablet ? 0.025.sh : 0.03.sh),
+                      SizedBox(
+                        width: isTablet ? contentWidth * 0.5 : 0.6.sw,
+                        child: _buildGradientDropdown(
+                          hint: AppLocalizations.language,
+                          value: selectedLanguage,
+                          items: languages,
+                          prefixIcon: Padding(
+                            padding: EdgeInsets.all(12.w),
+                            child: CustomSvgImage(
+                              imageUrl: AppImages.languageSvg,
+                              height: isTablet ? 24.h : 21.h,
+                              width: isTablet ? 24.w : 21.w,
+                            ),
+                          ),
+                          onChanged: (val) => _changeLanguage(val),
+                        ),
+                      ),
+                      SizedBox(height: isTablet ? 0.025.sh : 0.03.sh),
+                      SizedBox(
+                        width: isTablet ? contentWidth * 0.5 : 0.6.sw,
+                        child: _buildGradientDropdown(
+                          hint: AppLocalizations.country,
+                          value: selectedCountry,
+                          items: countries,
+                          prefixIcon: Padding(
+                            padding: EdgeInsets.all(12.w),
+                            child: CustomSvgImage(
+                              imageUrl: AppImages.coutrySvg,
+                              height: isTablet ? 24.h : 21.h,
+                              width: isTablet ? 24.w : 21.w,
+                            ),
+                          ),
+                          onChanged: (val) {
+                            setState(() => selectedCountry = val);
+                            // Trigger rebuild to update button state
+                            if (mounted) setState(() {});
+                          },
+                        ),
+                      ),
+                      SizedBox(height: isTablet ? 30.h : 25.h),
+                      InkWell(
+                        onTap: (_isSubmitting || !_areAllFieldsFilled())
+                            ? null
+                            : _handleGuestSignup,
+                        child: Opacity(
+                          opacity: (_isSubmitting || !_areAllFieldsFilled())
+                              ? 0.5
+                              : 1.0,
+                          child: Row(
+                            children: [
+                              const Spacer(),
+                              _isSubmitting
+                                  ? SizedBox(
+                                      width: isTablet ? 20.sp : 18.sp,
+                                      height: isTablet ? 20.sp : 18.sp,
+                                      child: const CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : TextWidget(
+                                      text: AppLocalizations.next,
+                                      fontSize: isTablet ? 20.sp : 18.sp,
+                                      color: AppColors.whiteColor,
+                                    ),
+                              Icon(Icons.navigate_next_outlined,
+                                  color: AppColors.whiteColor,
+                                  size: isTablet ? 26.sp : 22.sp),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+                ),
+              ],
+            ), // Column
+          ), // SingleChildScrollView
+        ), // SizedBox
+      ), // Center
+    ); // Padding
   }
 
-  Widget _buildAvatarSelectionStack(List<Widget> avatars, double size) {
-    double centerX = 0.5.sw;
-    double centerY = 0.17.sh;
+  Widget _buildAvatarSelectionStack(
+      List<Widget> avatars, double size, double contentWidth, bool isTablet) {
+    double centerX = contentWidth * 0.5;
+    double centerY = isTablet ? 0.12.sh : 0.17.sh;
 
-    // 4 bubble positions from old code (keep bubbles same, just map avatars)
-    final bubblePositions = [
-      {'x': centerX - 0.35.sw, 'y': centerY}, // Top left
-      {'x': centerX - 0.44.sw, 'y': centerY + 31.h}, // Bottom left
-      {'x': centerX + 0.22.sw, 'y': centerY + 2.h}, // Top right
-      {'x': centerX + 0.38.sw, 'y': centerY + 32.h}, // Bottom right
-    ];
+    // 4 bubble positions - adjusted for tablet view
+    final bubblePositions = isTablet
+        ? [
+            {'x': centerX - contentWidth * 0.28, 'y': centerY}, // Top left
+            {
+              'x': centerX - contentWidth * 0.35,
+              'y': centerY + 40.h
+            }, // Bottom left
+            {
+              'x': centerX + contentWidth * 0.18,
+              'y': centerY + 5.h
+            }, // Top right
+            {
+              'x': centerX + contentWidth * 0.30,
+              'y': centerY + 45.h
+            }, // Bottom right
+          ]
+        : [
+            {'x': centerX - contentWidth * 0.35, 'y': centerY}, // Top left
+            {
+              'x': centerX - contentWidth * 0.44,
+              'y': centerY + 31.h
+            }, // Bottom left
+            {
+              'x': centerX + contentWidth * 0.22,
+              'y': centerY + 2.h
+            }, // Top right
+            {
+              'x': centerX + contentWidth * 0.38,
+              'y': centerY + 32.h
+            }, // Bottom right
+          ];
 
     return SizedBox(
       height: 0.3.sh,
@@ -545,8 +587,9 @@ class _GuestSignUpScreenState extends State<GuestSignUpScreen>
           // Don't show the moving avatar in the selection stack
           if (index == _movingAvatarIndex) return const SizedBox.shrink();
           // Don't show the selected avatar in the surrounding positions
-          if (index == selectedAvatarIndex && _movingAvatarIndex == null)
+          if (index == selectedAvatarIndex && _movingAvatarIndex == null) {
             return const SizedBox.shrink();
+          }
 
           // Map avatar index to bubble position (skip center avatar index 2)
           int bubbleIndex = index;
@@ -602,18 +645,43 @@ class _GuestSignUpScreenState extends State<GuestSignUpScreen>
     );
   }
 
-  Widget _buildMovingAvatar(int index) {
-    double centerX = 0.5.sw;
-    double centerY = 0.17.sh;
-    double size = 0.15.sw;
+  Widget _buildMovingAvatar(int index, double contentWidth, bool isTablet) {
+    double centerX = contentWidth * 0.5;
+    double centerY = isTablet ? 0.12.sh : 0.17.sh;
+    double size = isTablet ? contentWidth * 0.12 : contentWidth * 0.15;
 
-    // 4 bubble positions from old code (keep bubbles same, just map avatars)
-    final bubblePositions = [
-      {'x': centerX - 0.37.sw, 'y': centerY}, // Top left
-      {'x': centerX - 0.44.sw, 'y': centerY + 31.h}, // Bottom left
-      {'x': centerX + 0.22.sw, 'y': centerY + 2.h}, // Top right
-      {'x': centerX + 0.36.sw, 'y': centerY + 32.h}, // Bottom right
-    ];
+    // 4 bubble positions - adjusted for tablet view
+    final bubblePositions = isTablet
+        ? [
+            {'x': centerX - contentWidth * 0.30, 'y': centerY}, // Top left
+            {
+              'x': centerX - contentWidth * 0.37,
+              'y': centerY + 40.h
+            }, // Bottom left
+            {
+              'x': centerX + contentWidth * 0.20,
+              'y': centerY + 5.h
+            }, // Top right
+            {
+              'x': centerX + contentWidth * 0.32,
+              'y': centerY + 45.h
+            }, // Bottom right
+          ]
+        : [
+            {'x': centerX - contentWidth * 0.37, 'y': centerY}, // Top left
+            {
+              'x': centerX - contentWidth * 0.44,
+              'y': centerY + 31.h
+            }, // Bottom left
+            {
+              'x': centerX + contentWidth * 0.22,
+              'y': centerY + 2.h
+            }, // Top right
+            {
+              'x': centerX + contentWidth * 0.36,
+              'y': centerY + 32.h
+            }, // Bottom right
+          ];
 
     // Map avatar index to bubble position (skip center avatar index 2)
     int bubbleIndex = index;
@@ -627,8 +695,10 @@ class _GuestSignUpScreenState extends State<GuestSignUpScreen>
     double startY = bubblePositions[bubbleIndex]['y']!;
 
     // Calculate center position (where the main avatar is)
-    double endX = 0.5.sw - 40.w; // Center minus half width
-    double endY = 0.17.sh - 40.h; // Center minus half height
+    double endX = contentWidth * 0.5 -
+        (isTablet ? 50.w : 40.w); // Center minus half width
+    double endY = (isTablet ? 0.12.sh : 0.17.sh) -
+        (isTablet ? 50.h : 40.h); // Center minus half height
 
     return AnimatedBuilder(
       animation: _avatarMoveController,
@@ -902,16 +972,17 @@ class _GuestSignUpScreenState extends State<GuestSignUpScreen>
         children: [
           // Full-screen video without cutting
           Center(
-            child: _videoController != null && _videoController!.value.isInitialized
+            child: _videoController != null &&
+                    _videoController!.value.isInitialized
                 ? FittedBox(
-              fit: BoxFit.contain, // Ensures entire video is visible
-              alignment: Alignment.center,
-              child: SizedBox(
-                width: _videoController!.value.size.width,
-                height: _videoController!.value.size.height,
-                child: VideoPlayer(_videoController!),
-              ),
-            )
+                    fit: BoxFit.contain, // Ensures entire video is visible
+                    alignment: Alignment.center,
+                    child: SizedBox(
+                      width: _videoController!.value.size.width,
+                      height: _videoController!.value.size.height,
+                      child: VideoPlayer(_videoController!),
+                    ),
+                  )
                 : const CircularProgressIndicator(color: Colors.white),
           ),
 
@@ -920,7 +991,7 @@ class _GuestSignUpScreenState extends State<GuestSignUpScreen>
             child: Column(
               children: [
                 // Top coin container
-                CoinContainer(coins: coinReward),
+                const CoinContainer(coins: coinReward),
 
                 const Spacer(),
 
@@ -928,8 +999,9 @@ class _GuestSignUpScreenState extends State<GuestSignUpScreen>
                 AnimatedBuilder(
                   animation: _controller,
                   builder: (context, child) {
-                    final count =
-                    (coinReward * _controller.value).round().clamp(0, coinReward);
+                    final count = (coinReward * _controller.value)
+                        .round()
+                        .clamp(0, coinReward);
                     return TextWidget(
                       text: "+ $count Coins",
                       fontSize: 28.sp,
@@ -951,7 +1023,8 @@ class _GuestSignUpScreenState extends State<GuestSignUpScreen>
                       children: [
                         Text(
                           "Skip ",
-                          style: TextStyle(color: Colors.white70, fontSize: 16.sp),
+                          style:
+                              TextStyle(color: Colors.white70, fontSize: 16.sp),
                         ),
                         Icon(Icons.arrow_forward_ios,
                             size: 18.sp, color: Colors.white70),
@@ -966,6 +1039,4 @@ class _GuestSignUpScreenState extends State<GuestSignUpScreen>
       ),
     );
   }
-
-
 }

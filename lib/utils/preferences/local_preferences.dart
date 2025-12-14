@@ -76,7 +76,7 @@ class LocalStorageUtils {
   }
 
   static Future<double> getVolume() async {
-    final vol = await instance.getDouble('volume') ?? 1;
+    final vol = instance.getDouble('volume') ?? 1;
     return vol;
   }
 

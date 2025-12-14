@@ -7,12 +7,16 @@ class AdService {
   // iOS App ID: ca-app-pub-2111477197639109~9891158883
 
   // Android Ad Unit IDs
-  static const String androidBannerAdUnitId = 'ca-app-pub-2111477197639109/9642912729';
-  static const String androidInterstitialAdUnitId = 'ca-app-pub-2111477197639109/8228337825';
+  static const String androidBannerAdUnitId =
+      'ca-app-pub-2111477197639109/9642912729';
+  static const String androidInterstitialAdUnitId =
+      'ca-app-pub-2111477197639109/8228337825';
 
   // iOS Ad Unit IDs
-  static const String iosBannerAdUnitId = 'ca-app-pub-2111477197639109/6915256150';
-  static const String iosInterstitialAdUnitId = 'ca-app-pub-2111477197639109/3822969209';
+  static const String iosBannerAdUnitId =
+      'ca-app-pub-2111477197639109/6915256150';
+  static const String iosInterstitialAdUnitId =
+      'ca-app-pub-2111477197639109/3822969209';
 
   // Track initialization status
   static bool _initialized = false;
@@ -40,7 +44,7 @@ class AdService {
   // Initialize Google Mobile Ads SDK
   static Future<void> initializeMobileAds() async {
     if (_initialized) return;
-    
+
     try {
       // On iOS we must request tracking authorization before initializing ads.
       await _requestTrackingAuthorizationIfNeeded();
@@ -103,7 +107,8 @@ class AdService {
         size: AdSize.banner,
         listener: BannerAdListener(
           onAdLoaded: (Ad ad) => onAdLoaded(ad),
-          onAdFailedToLoad: (Ad ad, LoadAdError error) => onAdFailedToLoad(ad, error),
+          onAdFailedToLoad: (Ad ad, LoadAdError error) =>
+              onAdFailedToLoad(ad, error),
         ),
       );
 
