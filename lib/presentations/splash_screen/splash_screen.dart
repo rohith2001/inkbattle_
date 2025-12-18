@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:inkbattle_frontend/constants/app_images.dart';
 import 'package:inkbattle_frontend/utils/routes/routes.dart';
 import 'package:inkbattle_frontend/widgets/backgroun_scafold.dart';
@@ -16,10 +18,20 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   final UserRepository _userRepository = UserRepository();
+  String _version = "";
+
+  // Adding the Version Number to Splash Screen
+  Future<void> _initPackageInfo() async {
+    final info = await PackageInfo.fromPlatform();
+    setState(() {
+      _version = "${info.version}+${info.buildNumber}";
+    });
+  }
 
   @override
   void initState() {
     super.initState();
+    _initPackageInfo();
     _checkAuthAndNavigate();
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -70,10 +82,29 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return BackgroundScaffold(
-      child: Center(
-        child: Image.asset(
-          AppImages.logo,
-        ),
+      child: Stack( // Use a Stack to place version at the bottom
+        children: [
+          Center(
+            child: Image.asset(AppImages.logo, 
+            width: 200.w, // Added width scaling for tablets
+            fit: BoxFit.contain),
+          ),
+          // Responsive Version Label
+          Positioned(
+            bottom: 30.h, // Scales the distance from the bottom
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Text(
+                "Version $_version",
+                style: TextStyle(
+                  color: Colors.white70, 
+                  fontSize: 12.sp // Scales font for readability on tablets
+                  ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -717,6 +717,8 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   int _lastDrawingEmitTime = 0;
+  // Buffer to hold the active drawing so we don't lose it when the finger lifts.
+  fdb.Stroke? _lastInProgressStroke;
 
   Future<void> _initializeRoom() async {
     try {
@@ -2326,7 +2328,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     teams: teams,
                     isTeamvTeam: isTeamMode,
                     onNext: () {
-                      _toggleLeaderboard(closeRoom: true);
+                      // _toggleLeaderboard(closeRoom: true);
+                      Navigator.of(context).pop(); // ✅ Close popup
+                      _showCloseAdAndNavigate();   // ✅ Show ad
                     },
                   ),
                 );
@@ -2386,7 +2390,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                 teams: teams,
                 isTeamvTeam: isTeamMode,
                 onNext: () {
-                  _toggleLeaderboard(closeRoom: true);
+                  // _toggleLeaderboard(closeRoom: true);
+                  Navigator.of(context).pop(); // ✅ Close popup
+                  _showCloseAdAndNavigate();   // ✅ Show ad
                 },
               ),
             );
@@ -2852,18 +2858,35 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                   strokesListenable: _strokes,
                                   currentStrokeListenable: _currentStroke,
                                   options: fdb.DrawingCanvasOptions(
-                                    currentTool:
-                                        _currentTool == DrawingTool.eraser
-                                            ? fdb_tool.DrawingTool.pencil
-                                            : _getFdbDrawingTool(_currentTool),
-                                    strokeColor:
-                                        _currentTool == DrawingTool.eraser
-                                            ? Colors.black
-                                            : _selectedColor,
-                                    size: _strokeWidth,
-                                    opacity: _currentTool == DrawingTool.eraser
-                                        ? 1.0
-                                        : _selectedColor.opacity,
+                                    // currentTool:
+                                    //     _currentTool == DrawingTool.eraser
+                                    //         ? fdb_tool.DrawingTool.pencil
+                                    //         : _getFdbDrawingTool(_currentTool),
+                                    // strokeColor:
+                                    //     _currentTool == DrawingTool.eraser
+                                    //         ? Colors.black
+                                    //         : _selectedColor,
+                                    // size: _strokeWidth,
+                                    // opacity: _currentTool == DrawingTool.eraser
+                                    //     ? 1.0
+                                    //     : _selectedColor.opacity,
+                                    // backgroundColor: Colors.black,
+                                    // showGrid: _showGrid.value,
+                                    // fillShape: _isFilled(_currentTool),
+                                    // polygonSides: _polygonSides.value,
+
+                                    currentTool: _getFdbDrawingTool(_currentTool),
+                                    // 1. COLOR: Force Black (or background color) if Eraser. 
+                                    // This ensures "Clean Data" is sent to the server, so other players don't see "Red Eraser" strokes.
+                                    strokeColor: _currentTool == DrawingTool.eraser 
+                                      ? Colors.black : _selectedColor,
+                                    // 2. SIZE: 3x bigger if Eraser
+                                    size: _currentTool == DrawingTool.eraser 
+                                      ? _strokeWidth * 3.0 : _strokeWidth,
+                                    // 3. OPACITY: Force 1.0 (Solid) if Eraser
+                                    // This prevents "Transparent Erasing" which looks like gray smudges on other screens.
+                                    opacity: _currentTool == DrawingTool.eraser 
+                                      ? 1.0 : _selectedColor.opacity,
                                     backgroundColor: Colors.black,
                                     showGrid: _showGrid.value,
                                     fillShape: _isFilled(_currentTool),
@@ -2880,8 +2903,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
 
                                     // 1. END OF STROKE (User lifted finger)
                                     if (stroke == null) {
-                                      if (_strokes.value.isNotEmpty) {
-                                        final finalStroke = _strokes.value.last.toJson();
+                                      // Send the captured stroke, NOT the old history list
+                                      if (_lastInProgressStroke != null) {
+                                        final finalStroke = _lastInProgressStroke!.toJson();
                                         // Mark as finished so receiver knows to add it to history
                                         finalStroke['isFinished'] = true; // Use a wrapper if you prefer
 
@@ -2891,6 +2915,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                           'strokes': finalStroke,
                                           'isFinished': true
                                         });
+                                        _lastInProgressStroke = null; // Cleanup
                                       }
                                       return;
                                     }
@@ -2901,16 +2926,22 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                     // For now, we rely on the fact that Flutter calls this frequently.
 
                                     final _now = DateTime.now().millisecondsSinceEpoch;
+                                    _lastInProgressStroke = stroke; // Capture the stroke
+
+                                    // Throttle: 100ms for big strokes (coloring), 30ms for small (writing)
+                                    int throttleTime = (stroke.points.length > 500) ? 100 : 30;
 
                                     // Inside onDrawingStrokeChanged, inside the `else` (stroke != null) block:
-                                    if (_now - _lastDrawingEmitTime > 30) {
+                                    if (_now - _lastDrawingEmitTime > throttleTime) {
                                       _lastDrawingEmitTime = _now;
 
-                                      _socketService.socket?.emit('drawing_data', {
-                                        'roomId': widget.roomId,
-                                        'strokes': stroke.toJson(),
-                                        'isFinished': false // Mark as in-progress
-                                      });
+                                      try {
+                                        _socketService.socket?.emit('drawing_data', {
+                                          'roomId': widget.roomId,
+                                          'strokes': stroke.toJson(),
+                                          'isFinished': false 
+                                        });
+                                      } catch (e) { print("Error sending drawing data: $e"); }
                                     }
                                   },
                                   backgroundImageListenable: _backgroundImage,
@@ -4222,22 +4253,22 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           // Room code with copy
           Expanded(
             flex: 1,
-            child: Container(
-              height: 38.h,
-              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 02.h),
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                border: Border.all(color: Colors.white, width: 2.w),
-                borderRadius: BorderRadius.circular(25.r),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset(AppImages.copy1, width: 14.w, height: 16.h),
-                  SizedBox(width: 6.w),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: _copyRoomCode,
+            child: GestureDetector(
+              onTap: _copyRoomCode,
+              child: Container(
+                height: 38.h,
+                padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 02.h),
+                decoration: BoxDecoration(
+                  color: Colors.transparent,
+                  border: Border.all(color: Colors.white, width: 2.w),
+                  borderRadius: BorderRadius.circular(25.r),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset(AppImages.copy1, width: 14.w, height: 16.h),
+                    SizedBox(width: 6.w),
+                    Expanded(
                       child: Container(
                         decoration: BoxDecoration(
                           color: AppColors.darkBlue,
@@ -4258,10 +4289,10 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                         ),
                       ),
                     ),
-                  ),
-                  SizedBox(width: 6.w),
-                  Image.asset(AppImages.copy, width: 14.w, height: 16.h),
-                ],
+                    SizedBox(width: 6.w),
+                    Image.asset(AppImages.copy, width: 14.w, height: 16.h),
+                  ],
+                ),
               ),
             ),
           ),

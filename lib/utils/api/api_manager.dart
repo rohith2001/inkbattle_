@@ -30,6 +30,14 @@ class ApiManager {
   }) async {
     await _getToken();
     try {
+      // Check if token is required but not available
+      if (isTokenMandatory && (token == null || token!.isEmpty)) {
+        throw UnauthorisedException(
+          'Authentication required. Please sign in again.',
+          {'error': 'missing_token'},
+        );
+      }
+      
       Map<String, String> headers = {
         'Content-Type': contentType ?? jsonContentType,
       };
@@ -57,6 +65,14 @@ class ApiManager {
   }) async {
     await _getToken();
     try {
+      // Check if token is required but not available
+      if (isTokenMandatory && (token == null || token!.isEmpty)) {
+        throw UnauthorisedException(
+          'Authentication required. Please sign in again.',
+          {'error': 'missing_token'},
+        );
+      }
+      
       Map<String, String> headers = {
         'Content-Type': contentType,
       };
@@ -92,6 +108,14 @@ class ApiManager {
   }) async {
     await _getToken();
     try {
+      // Check if token is required but not available
+      if (isTokenMandatory && (token == null || token!.isEmpty)) {
+        throw UnauthorisedException(
+          'Authentication required. Please sign in again.',
+          {'error': 'missing_token'},
+        );
+      }
+      
       Map<String, String> headers = {
         'Content-Type': contentType,
       };
@@ -177,23 +201,36 @@ class ApiManager {
         var responseJson = json.decode(response.body);
         log("Response Json ${response.statusCode} -> ${responseJson.toString()}");
 
-        if (responseJson['url'] != '') {
+        // Check for explicit success indicators
+        // Handle responses with 'success' boolean (e.g., room creation)
+        if (responseJson['success'] == true) {
           return responseJson;
         }
-        if (responseJson['status'] != "Success") {
+        // Handle responses with 'status' string
+        if (responseJson['status'] == "Success") {
+          return responseJson;
+        }
+        // Handle responses with 'url' (e.g., file uploads)
+        if (responseJson['url'] != null && responseJson['url'] != '') {
+          return responseJson;
+        }
+        // If no explicit success indicator, check for error indicators
+        if (responseJson['success'] == false || responseJson['status'] == "Error") {
           throw BadRequestException(
-            '${responseJson['message']}',
+            '${responseJson['message'] ?? 'Request failed'}',
             responseJson,
           );
         }
+        // Default: return the response if no error indicators found
         return responseJson;
       case 201:
         var responseJson = json.decode(response.body);
         log("Response Json ${response.statusCode} -> ${responseJson.toString()}");
 
-        if (responseJson['status'] == false) {
+        // Check for explicit failure indicators
+        if (responseJson['success'] == false || responseJson['status'] == false) {
           throw BadRequestException(
-            '${responseJson['message']}',
+            '${responseJson['message'] ?? 'Request failed'}',
             responseJson,
           );
         }

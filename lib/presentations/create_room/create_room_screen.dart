@@ -202,13 +202,23 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
       result.fold(
         (failure) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                    '${AppLocalizations.failedToCreateRoom}: ${failure.message}'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            // Check for authentication errors
+            final errorMessage = failure.message.toLowerCase();
+            if (errorMessage.contains('authentication') || 
+                errorMessage.contains('unauthorized') ||
+                errorMessage.contains('401') ||
+                errorMessage.contains('missing_token')) {
+              // Show authentication error and offer to sign in again
+              _showAuthErrorDialog();
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                      '${AppLocalizations.failedToCreateRoom}: ${failure.message}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           }
         },
         (roomResponse) async {
@@ -217,23 +227,30 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
             _lastCreatedRoomId = roomResponse.room?.id;
 
             // Show room code dialog
-            if (roomResponse.room?.code != null) {
-              _showRoomCodeDialog(roomResponse.room!.code!);
-            } else {
+            // if (roomResponse.room?.code != null) {
+            //   _showRoomCodeDialog(roomResponse.room!.code!);
+            // } else {
               // Navigate directly to lobby
               context.go('/game-room/${roomResponse.room?.id}');
-            }
+            // }
           }
         },
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        final errorMessage = e.toString().toLowerCase();
+        if (errorMessage.contains('authentication') || 
+            errorMessage.contains('unauthorized') ||
+            errorMessage.contains('missing_token')) {
+          _showAuthErrorDialog();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${AppLocalizations.error}: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) {
@@ -242,6 +259,44 @@ class _CreateRoomScreenState extends State<CreateRoomScreen> {
         });
       }
     }
+  }
+  
+  void _showAuthErrorDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A2E),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        title: TextWidget(
+          text: AppLocalizations.error,
+          fontSize: 20.sp,
+          fontWeight: FontWeight.bold,
+          color: AppColors.whiteColor,
+        ),
+        content: TextWidget(
+          text: 'Your session has expired. Please sign in again.',
+          fontSize: 14.sp,
+          color: Colors.white70,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Navigate back to sign in screen
+              context.go('/');
+            },
+            child: TextWidget(
+              text: 'Sign In',
+              fontSize: 16.sp,
+              color: Colors.blue,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showRoomCodeDialog(String code) {
