@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:developer';
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:inkbattle_frontend/config/environment.dart';
 import 'package:inkbattle_frontend/utils/preferences/local_preferences.dart';
 import 'package:mime/mime.dart';
 import 'package:http/http.dart' as http;
@@ -40,6 +41,8 @@ class ApiManager {
       
       Map<String, String> headers = {
         'Content-Type': contentType ?? jsonContentType,
+        'Accept': jsonContentType,
+        'X-App-Secret': Environment.appSecret,
       };
       if (isTokenMandatory && token != null && token!.isNotEmpty) {
         headers['Authorization'] = 'Bearer $token';
@@ -75,6 +78,8 @@ class ApiManager {
       
       Map<String, String> headers = {
         'Content-Type': contentType,
+        'Accept': jsonContentType,
+        'X-App-Secret': Environment.appSecret,
       };
       if (headersParams != null) {
         headers.addAll(headersParams);
@@ -118,6 +123,8 @@ class ApiManager {
       
       Map<String, String> headers = {
         'Content-Type': contentType,
+        'Accept': jsonContentType,
+        'X-App-Secret': Environment.appSecret,
       };
 
       if (isTokenMandatory && token != null && token!.isNotEmpty) {
@@ -149,6 +156,8 @@ class ApiManager {
     try {
       Map<String, String> headers = {
         'Content-Type': contentType,
+        'Accept': jsonContentType,
+        'X-App-Secret': Environment.appSecret,
       };
 
       if (isTokenMandatory && token != null && token!.isNotEmpty) {
@@ -196,6 +205,23 @@ class ApiManager {
   }
 
   dynamic _returnResponse(http.Response response) {
+    final contentType = response.headers['content-type'] ?? '';
+    final trimmedBody = response.body.trimLeft();
+    final bool looksLikeHtml =
+        contentType.toLowerCase().contains('text/html') ||
+        trimmedBody.toLowerCase().startsWith('<!doctype html') ||
+        trimmedBody.toLowerCase().startsWith('<html') ||
+        trimmedBody.startsWith('<');
+    if (looksLikeHtml) {
+      final location = response.headers['location'] ?? '';
+      final preview = trimmedBody.length > 200
+          ? trimmedBody.substring(0, 200)
+          : trimmedBody;
+      final locationSuffix = location.isNotEmpty ? ' Location: $location' : '';
+      throw FetchDataException(
+        'Unexpected HTML response (${response.statusCode}) from ${response.request?.url}.$locationSuffix Body preview: $preview',
+      );
+    }
     switch (response.statusCode) {
       case 200:
         var responseJson = json.decode(response.body);

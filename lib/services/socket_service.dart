@@ -27,6 +27,7 @@ class SocketService {
           .setTransports(['websocket'])
           .enableAutoConnect()
           .setAuth({'token': token})
+          .setExtraHeaders({'X-App-Secret': Environment.appSecret})
           .enableForceNew()
           .build(),
     );

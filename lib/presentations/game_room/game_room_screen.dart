@@ -2650,6 +2650,22 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         tool == DrawingTool.filledRectangle;
   }
 
+  fdb.StrokeType _getFdbStrokeType(DrawingTool tool) {
+    switch (tool) {
+      case DrawingTool.eraser:
+        return fdb.StrokeType.eraser;
+      case DrawingTool.circle:
+      case DrawingTool.filledCircle:
+        return fdb.StrokeType.circle;
+      case DrawingTool.rectangle:
+      case DrawingTool.filledRectangle:
+        return fdb.StrokeType.square;
+      case DrawingTool.pencil:
+      case DrawingTool.colorPicker:
+        return fdb.StrokeType.normal;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -2892,28 +2908,17 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                     fillShape: _isFilled(_currentTool),
                                     polygonSides: _polygonSides.value,
                                   ),
-                                  // onDrawingStrokeChanged: (stroke) {
-                                  //   if (stroke == null &&
-                                  //       _strokes.value.isNotEmpty) {
-                                  //     _socketService.sendDrawing(widget.roomId,
-                                  //         _strokes.value.last.toJson());
-                                  //   }
-                                  // },
-                                  onDrawingStrokeChanged: (stroke) {
 
+                                  onDrawingStrokeChanged: (stroke) {
                                     // 1. END OF STROKE (User lifted finger)
                                     if (stroke == null) {
                                       // Send the captured stroke, NOT the old history list
                                       if (_lastInProgressStroke != null) {
-                                        final finalStroke = _lastInProgressStroke!.toJson();
-                                        // Mark as finished so receiver knows to add it to history
-                                        finalStroke['isFinished'] = true; // Use a wrapper if you prefer
-
                                         // Sending the wrapper structure matching our receiver logic
                                         _socketService.socket?.emit('drawing_data', {
                                           'roomId': widget.roomId,
-                                          'strokes': finalStroke,
-                                          'isFinished': true
+                                          'strokes': _lastInProgressStroke!.toJson(),
+                                          'isFinished': true   // Guesser side will now move this to permanent history
                                         });
                                         _lastInProgressStroke = null; // Cleanup
                                       }
@@ -2921,27 +2926,65 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                     }
 
                                     // 2. ACTIVE DRAWING (User is dragging)
-                                    // Simple Throttle: Only send every ~30ms to prevent lag/disconnects
-                                    // You can add a static int _lastSendTime = 0; in your class to track this properly
-                                    // For now, we rely on the fact that Flutter calls this frequently.
-
-                                    final _now = DateTime.now().millisecondsSinceEpoch;
+                                    // Simple Throttle: Only send every ~40ms to prevent lag/disconnects
+                                    final now = DateTime.now().millisecondsSinceEpoch;
                                     _lastInProgressStroke = stroke; // Capture the stroke
 
-                                    // Throttle: 100ms for big strokes (coloring), 30ms for small (writing)
-                                    int throttleTime = (stroke.points.length > 500) ? 100 : 30;
+                                    // 1. CHOP LARGE STROKES: If the stroke is getting too heavy, split it.
+                                    if (stroke.points.length >= 750) {
+                                      // Send this segment as finished
+                                      // _sendDrawingUpdate(isFinished: true);
+                                      _socketService.socket?.emit('drawing_data', {
+                                        'roomId': widget.roomId,
+                                        'strokes': stroke.toJson(),
+                                        'isFinished': true // Split segment is sent as 'finished'
+                                      });
+                                      _strokes.value = List<fdb.Stroke>.from(_strokes.value)
+                                        ..add(stroke); // Add to local history
 
-                                    // Inside onDrawingStrokeChanged, inside the `else` (stroke != null) block:
-                                    if (_now - _lastDrawingEmitTime > throttleTime) {
-                                      _lastDrawingEmitTime = _now;
+                                      // Start a NEW stroke at the last point to continue seamlessly
+                                      _currentStroke.startStroke(
+                                        stroke.points.last,
+                                        color: _currentTool == DrawingTool.eraser
+                                          ? Colors.black
+                                          : _selectedColor,
+                                        size: _currentTool == DrawingTool.eraser
+                                          ? _strokeWidth * 3.0
+                                          : _strokeWidth,
+                                        opacity: _currentTool == DrawingTool.eraser
+                                          ? 1.0
+                                          : _selectedColor.opacity,
+                                        type: _getFdbStrokeType(_currentTool),
+                                        filled: _isFilled(_currentTool),
+                                      );
 
-                                      try {
+                                      // Emit the new stroke immediately so other players see continuous drawing
+                                      // instead of waiting for the next 40ms throttle tick.
+                                      final newStroke = _currentStroke.value;
+                                      if (newStroke != null) {
                                         _socketService.socket?.emit('drawing_data', {
                                           'roomId': widget.roomId,
-                                          'strokes': stroke.toJson(),
-                                          'isFinished': false 
+                                          'strokes': newStroke.toJson(),
+                                          'isFinished': false,
                                         });
-                                      } catch (e) { print("Error sending drawing data: $e"); }
+                                        _lastDrawingEmitTime = now;
+                                      }
+
+                                      // CRITICAL FIX: Update the tracking variable to the new empty/started stroke
+                                      // so the 'if (stroke == null)' block doesn't resend the old 500 points.
+                                      _lastInProgressStroke = null;
+                                      return;
+                                    }
+
+                                    // 2. REGULAR THROTTLE: Send real-time updates every 40ms
+                                    if (now - _lastDrawingEmitTime > 60) {
+                                      _lastDrawingEmitTime = now;
+                                      // _sendDrawingUpdate(isFinished: false);
+                                      _socketService.socket?.emit('drawing_data', {
+                                        'roomId': widget.roomId,
+                                        'strokes': stroke.toJson(),
+                                        'isFinished': false // Guesser updates _currentStroke for live preview
+                                      });
                                     }
                                   },
                                   backgroundImageListenable: _backgroundImage,
@@ -3013,6 +3056,17 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       ),
     );
   }
+
+// Helper to send drawing update
+// void _sendDrawingUpdate({required bool isFinished}) {
+//   if (_lastInProgressStroke == null) return;
+  
+//   _socketService.socket?.emit('drawing_data', {
+//     'roomId': widget.roomId,
+//     'strokes': _lastInProgressStroke!.toJson(),
+//     'isFinished': isFinished
+//   });
+// }
 
   void showChatToast(String userName, String message) {
     if (!mounted) return;

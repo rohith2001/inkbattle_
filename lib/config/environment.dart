@@ -4,14 +4,18 @@ class Environment {
   // For Android Emulator with adb reverse, use localhost
   // Run: adb reverse tcp:4000 tcp:4000
   // For iOS Simulator, also use localhost
+  static const String apiBaseUrl = "https://inkbattle.in/api";
+  static const String socketUrl = "https://inkbattle.in";
+  static const String appSecret = "InkBattle_Secure_2024"; // match Nginx exactly
 
-  static const String apiBaseUrl =
-      "http://ec2-35-154-241-0.ap-south-1.compute.amazonaws.com:4000/api";
-  static const String socketUrl =
-      "http://ec2-35-154-241-0.ap-south-1.compute.amazonaws.com:4000";
+  // static const String apiBaseUrl =
+  //     "http://ec2-35-154-241-0.ap-south-1.compute.amazonaws.com:4000/api";
+  // static const String socketUrl =
+  //     "http://ec2-35-154-241-0.ap-south-1.compute.amazonaws.com:4000";
 
-//static const String apiBaseUrl = "http://192.168.1.6:4000/api";
-//  static const String socketUrl = "http://192.168.1.6:4000";
+
+// static const String apiBaseUrl = "http://192.168.1.6:4000/api";
+// static const String socketUrl = "http://192.168.1.6:4000";
 
   // static const String apiBaseUrl =
   //     "https://inkbattle-a-backend.onrender.com/api";

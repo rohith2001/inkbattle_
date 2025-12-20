@@ -50,8 +50,12 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.release
-            minifyEnabled false
-            shrinkResources false
+
+            // Enables code shrinking, obfuscation, and optimization
+            minifyEnabled true
+
+            // Removes unused resource files (images, layouts) from the APK
+            shrinkResources true
         }
     }
 }
