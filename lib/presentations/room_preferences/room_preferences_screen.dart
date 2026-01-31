@@ -11,6 +11,7 @@ import 'package:inkbattle_frontend/widgets/blue_background_scaffold.dart';
 import 'package:inkbattle_frontend/widgets/custom_svg.dart';
 import 'package:inkbattle_frontend/widgets/text_widget.dart';
 import 'package:inkbattle_frontend/widgets/persistent_banner_ad_widget.dart';
+import 'package:google_fonts/google_fonts.dart'; // Added for typography
 
 class RoomPreferencesScreen extends StatefulWidget {
   const RoomPreferencesScreen({super.key});
@@ -30,7 +31,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
   int? selectedTargetPoints;
   bool voiceEnabled = false;
   bool _isLoading = false;
-  
+
   // REMOVED: Ad variables
   // BannerAd? _bannerAd;
   // bool _isBannerAdLoaded = false;
@@ -69,7 +70,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
     // Load languages
     final languagesResult = await _userRepository.getLanguages();
     languagesResult.fold(
-      (failure) {
+          (failure) {
         // Fallback to default values on error
         if (mounted) {
           setState(() {
@@ -77,7 +78,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
           });
         }
       },
-      (languagesList) {
+          (languagesList) {
         if (languagesList.isEmpty) {
           // Fallback to default values if empty
           if (mounted) {
@@ -102,7 +103,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
     // Load categories
     final categoriesResult = await _themeRepository.getCategories();
     categoriesResult.fold(
-      (failure) {
+          (failure) {
         // Fallback to default values on error
         if (mounted) {
           setState(() {
@@ -110,7 +111,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
           });
         }
       },
-      (categoriesList) {
+          (categoriesList) {
         if (categoriesList.isEmpty) {
           // Fallback to default values if empty
           if (mounted) {
@@ -163,7 +164,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
       );
 
       result.fold(
-        (failure) {
+            (failure) {
           if (mounted) {
             // Check if it's insufficient coins error
             if (failure.message.contains('insufficient_coins')) {
@@ -183,7 +184,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
             }
           }
         },
-        (roomResponse) async {
+            (roomResponse) async {
           // Check if match was found
           if (roomResponse.success == true) {
             if (mounted) {
@@ -354,7 +355,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
       );
 
       result.fold(
-        (failure) {
+            (failure) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -364,7 +365,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
             );
           }
         },
-        (roomResponse) async {
+            (roomResponse) async {
           // Deduct 250 coins
           await _userRepository.addCoins(amount: -250, reason: 'room_create');
 
@@ -394,102 +395,130 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final mq = MediaQuery.of(context);
-    final bool isTablet = mq.size.width > 600;
-    final double controlWidth = mq.size.width - (isTablet ? 40.w : 24.w);
-
+    // Removed manual tablet checks - use ScreenUtil for consistent scaling
+    
     return BlueBackgroundScaffold(
       child: SafeArea(
         bottom: true, // Protect bottom for ad visibility
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 15.w, vertical: 15.h),
-          child: Column(
-            children: [
-              // Back button and title
-              Row(
+        child: Column(
+          children: [
+            // HEADER
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
+              child: Row(
                 children: [
-                  GestureDetector(
+                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const CustomSvgImage(
-                      imageUrl: AppImages.arrow_back,
-                      height: 25,
-                      width: 25,
+                    child: Container(
+                      padding: EdgeInsets.all(8.w),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.arrow_back,
+                        color: Colors.white,
+                        size: 24.sp,
+                      ),
                     ),
                   ),
-                  SizedBox(width: 15.w),
-                  TextWidget(
-                    text: AppLocalizations.randomMatch,
-                    fontSize: 20.sp,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.whiteColor,
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        AppLocalizations.randomMatch,
+                        style: GoogleFonts.orbitron( // Game font
+                          fontSize: 24.sp, // Reduced from 26.sp
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          shadows: [
+                            BoxShadow(
+                              color: Colors.blue.withOpacity(0.8),
+                              blurRadius: 15,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
+                  SizedBox(width: 60.w), // Balance back button
                 ],
               ),
-              SizedBox(height: 30.h),
+            ),
 
-              // Preferences form
-              Expanded(
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      // Language
-                      _buildDropdown(
-                        width: controlWidth,
-                        hint: AppLocalizations.selectLanguage,
-                        value: selectedLanguage,
-                        items: languages,
-                        imageurl: AppImages.mp1,
-                        onChanged: (v) => setState(() => selectedLanguage = v),
-                      ),
-                      SizedBox(height: 15.h),
+            SizedBox(height: 10.h),
 
-                      // Country
-                      _buildDropdown(
-                        width: controlWidth,
-                        hint: AppLocalizations.country,
-                        value: selectedCountry,
-                        items: countries,
-                        imageurl: AppImages.mp4,
-                        onChanged: (v) => setState(() => selectedCountry = v),
-                      ),
-                      SizedBox(height: 15.h),
+            // MAIN CONTENT
+            Expanded(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: 500.w), // Re-introduced constraint
+                  child: SizedBox(
+                    width: MediaQuery.of(context).size.width > 600
+                          ? 480
+                          : 0.82.sw, // was 0.9
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Language
+                          _buildGradientDropdown(
+                            hint: AppLocalizations.selectLanguage,
+                            value: selectedLanguage,
+                            items: languages,
+                            iconData: Icons.language,
+                            onChanged: (v) => setState(() => selectedLanguage = v),
+                          ),
+                          SizedBox(height: 20.h),
 
-                      // Category
-                      _buildDropdown(
-                        width: controlWidth,
-                        hint: AppLocalizations.selectCategory,
-                        value: selectedCategory,
-                        items: categories,
-                        imageurl: AppImages.mp5,
-                        onChanged: (v) => setState(() => selectedCategory = v),
-                      ),
-                      SizedBox(height: 15.h),
+                          // Country
+                          _buildGradientDropdown(
+                            hint: AppLocalizations.country,
+                            value: selectedCountry,
+                            items: countries,
+                            iconData: Icons.public,
+                            onChanged: (v) => setState(() => selectedCountry = v),
+                          ),
+                          SizedBox(height: 20.h),
 
-                      // Target Points
-                      _buildDropdown(
-                        width: controlWidth,
-                        hint: AppLocalizations.selectTargetPoints,
-                        value: selectedTargetPoints?.toString(),
-                        items: targetPoints.map((e) => e.toString()).toList(),
-                        imageurl: AppImages.mp3,
-                        onChanged: (v) => setState(() =>
+                          // Category
+                          _buildGradientDropdown(
+                            hint: AppLocalizations.selectCategory,
+                            value: selectedCategory,
+                            items: categories,
+                            iconData: Icons.grid_view_rounded,
+                            onChanged: (v) => setState(() => selectedCategory = v),
+                          ),
+                          SizedBox(height: 20.h),
+
+                          // Target Points
+                          _buildGradientDropdown(
+                            hint: AppLocalizations.selectTargetPoints,
+                            value: selectedTargetPoints?.toString(),
+                            items: targetPoints.map((e) => e.toString()).toList(),
+                            iconData: Icons.ads_click,
+                            onChanged: (v) => setState(() =>
                             selectedTargetPoints = int.tryParse(v ?? '100')),
+                          ),
+                          SizedBox(height: 40.h),
+
+                          // Join button
+                          _buildJoinButton(),
+                          
+                          SizedBox(height: 20.h), // Bottom padding for scrolling
+                        ],
                       ),
-                      SizedBox(height: 15.h),
-
-                      SizedBox(height: 30.h),
-
-                      // Join button
-                      _buildJoinButton(),
-                    ],
+                    ),
                   ),
                 ),
               ),
-              
-              // Persistent Banner Ad (app-wide, loaded once)
-              const PersistentBannerAdWidget(),
-            ],
-          ),
+            ),
+
+            // Persistent Banner Ad (app-wide, loaded once)
+            const PersistentBannerAdWidget(),
+          ],
         ),
       ),
     );
@@ -497,180 +526,44 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
 
   Widget _buildJoinButton() {
     return Container(
-      width: double.infinity,
-      height: 55.h,
+      width: double.infinity, // Fills the constrained parent
+      height: 58.h, // Reduced from 65.h
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [
-            Color.fromRGBO(83, 128, 246, 1),
-            Color.fromRGBO(79, 62, 207, 1),
+            Color(0xFF00C6FF), // Cyan
+            Color(0xFF0072FF), // Blue
           ],
         ),
-        borderRadius: BorderRadius.circular(30.r),
+        borderRadius: BorderRadius.circular(15.r), // Match dropdown radius
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0072FF).withOpacity(0.5),
+            blurRadius: 20,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
+          padding: EdgeInsets.zero, // Remove default padding
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30.r),
+            borderRadius: BorderRadius.circular(15.r),
           ),
         ),
         onPressed: _isLoading ? null : _handlePlayRandom,
-        child: _isLoading
-            ? const CircularProgressIndicator(color: Colors.white)
-            : TextWidget(
-                text: AppLocalizations.playRandomCoins,
-                fontSize: 16.sp,
-                fontWeight: FontWeight.bold,
-                color: AppColors.whiteColor,
-              ),
-      ),
-    );
-  }
-
-  Widget _buildDropdown({
-    required double width,
-    required String hint,
-    required String? value,
-    required List<String> items,
-    required String imageurl,
-    required ValueChanged<String?> onChanged,
-  }) {
-    final GlobalKey tapKey = GlobalKey();
-    final bool isFilled = value != null;
-
-    return Container(
-      width: width,
-      height: 50.h,
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: isFilled ? Colors.white : Colors.grey,
-          width: 2,
-        ),
-        borderRadius: BorderRadius.circular(25.r),
-        color: Colors.black.withOpacity(0.3),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          key: tapKey,
-          borderRadius: BorderRadius.circular(25.r),
-          onTap: () async {
-            final box = tapKey.currentContext!.findRenderObject() as RenderBox;
-            final Offset pos = box.localToGlobal(Offset.zero);
-            final Size size = box.size;
-
-            final selected = await showMenu<String>(
-              context: context,
-              position: RelativeRect.fromLTRB(
-                pos.dx,
-                pos.dy + size.height + 5,
-                pos.dx + size.width,
-                pos.dy + size.height + 5,
-              ),
-              color: Colors.transparent,
-              constraints: BoxConstraints(
-                minWidth: size.width,
-                maxWidth: size.width,
-              ),
-              items: [
-                PopupMenuItem<String>(
-                  enabled: false,
-                  padding: EdgeInsets.zero,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(15.r),
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color.fromRGBO(255, 255, 255, 1),
-                          Color.fromRGBO(9, 189, 255, 1),
-                        ],
-                      ),
-                    ),
-                    padding: EdgeInsets.all(2.w),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(15.r),
-                        color: Colors.black,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: items.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final e = entry.value;
-                          return Container(
-                            decoration: BoxDecoration(
-                              border: index < items.length - 1
-                                  ? const Border(
-                                      bottom: BorderSide(
-                                        color:
-                                            Color.fromRGBO(255, 255, 255, 0.2),
-                                        width: 2,
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                            child: InkWell(
-                              onTap: () => Navigator.pop(context, e),
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: 15.w,
-                                  vertical: 12.h,
-                                ),
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    e,
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16.sp,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            );
-            if (selected != null) onChanged(selected);
-          },
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 15.w),
-            child: Row(
-              children: [
-                Image.asset(
-                  imageurl,
-                  width: 24.w,
-                  height: 24.h,
-                  color: Colors.white,
-                ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: Text(
-                    value ?? hint,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                    softWrap: false,
-                    style: TextStyle(
-                      color: value == null
-                          ? const Color.fromRGBO(255, 255, 255, 0.52)
-                          : Colors.white,
-                      fontSize: 16.sp,
-                    ),
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_drop_down,
-                  size: 24.sp,
-                  color: const Color.fromRGBO(9, 189, 255, 1),
-                ),
-              ],
+        child: Center(
+          child: _isLoading
+              ? const CircularProgressIndicator(color: Colors.white)
+              : Text(
+            AppLocalizations.playRandomCoins,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.exo2(
+              fontSize: 18.sp, // Kept readable size for button
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
             ),
           ),
         ),
@@ -678,54 +571,111 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
     );
   }
 
-  Widget _buildCheckbox({
-    required double width,
-    required String title,
-    required String imageurl,
-    required bool value,
-    required ValueChanged<bool?> onChanged,
+  Widget _buildGradientDropdown({
+    required String hint,
+    required String? value,
+    required List<String> items,
+    required IconData iconData,
+    required ValueChanged<String?> onChanged,
   }) {
+    final GlobalKey tapKey = GlobalKey();
+
     return Container(
-      width: width,
-      height: 50.h,
+      width: double.infinity,
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey, width: 2),
-        borderRadius: BorderRadius.circular(25.r),
-        color: Colors.black.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(15.r),
+        gradient: const LinearGradient(
+          colors: [
+            Color.fromRGBO(255, 255, 255, 0.8),
+            Color.fromRGBO(9, 189, 255, 0.8),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(25.r),
-        onTap: () => onChanged(!value),
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 15.w),
-          child: Row(
-            children: [
-              Image.asset(
-                imageurl,
-                width: 24.w,
-                height: 24.h,
-                color: value ? null : Colors.grey,
-              ),
-              SizedBox(width: 12.w),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16.sp,
-                  ),
+      padding: const EdgeInsets.all(1.2), // Border width
+      child: Container(
+        height: 58.h, // Reduced from 65.h
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.7),
+          borderRadius: BorderRadius.circular(14.r),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            key: tapKey,
+            borderRadius: BorderRadius.circular(13.r),
+            onTap: () async {
+              final box = tapKey.currentContext!.findRenderObject() as RenderBox;
+              final Offset pos = box.localToGlobal(Offset.zero);
+              final Size size = box.size;
+
+              final selected = await showMenu<String>(
+                context: context,
+                position: RelativeRect.fromLTRB(
+                  pos.dx,
+                  pos.dy + size.height + 5,
+                  pos.dx + size.width,
+                  pos.dy + size.height + 5,
                 ),
+                color: const Color(0xFF1E1E2C), // Dark dropdown bg
+                surfaceTintColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFF09BDFF), width: 1),
+                ),
+                constraints: BoxConstraints(
+                  minWidth: size.width,
+                  maxWidth: size.width,
+                  maxHeight: 300,
+                ),
+                items: items.map((e) {
+                  return PopupMenuItem<String>(
+                    value: e,
+                    child: Text(
+                      e,
+                      style: GoogleFonts.lato(color: Colors.white),
+                    ),
+                  );
+                }).toList(),
+              );
+              if (selected != null) onChanged(selected);
+            },
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center, // Ensured center alignment
+                children: [
+                  Icon(
+                    iconData,
+                    color: const Color(0xFF09BDFF),
+                    size: 24.sp, // Reduced from 28.sp
+                  ),
+                  SizedBox(width: 15.w), // Slightly reduced spacing
+                  Expanded(
+                    child: Text(
+                      value ?? hint,
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: GoogleFonts.lato(
+                        color: value == null ? Colors.white54 : Colors.white,
+                        fontSize: 16.sp, // Reduced from 18.sp
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 24.sp, // Reduced from 30.sp
+                    color: Colors.white70,
+                  ),
+                ],
               ),
-              Checkbox(
-                value: value,
-                onChanged: onChanged,
-                activeColor: const Color.fromARGB(255, 7, 182, 7),
-                checkColor: Colors.black,
-              ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 }
+

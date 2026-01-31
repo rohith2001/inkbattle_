@@ -361,16 +361,16 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
         bottom: true, // Protect bottom for ad visibility
         child: Center(
           child: SizedBox(
-            width: isTablet ? 600 : MediaQuery.of(context).size.width,
+            width: MediaQuery.of(context).size.width,
             child: Column(
               children: [
                 // Back button
                 Padding(
                   padding: EdgeInsets.only(
-                      left: isTablet ? 12.w : 8.w,
-                      top: isTablet ? 12.h : 8.h,
-                      bottom: isTablet ? 20.h : 16.h,
-                      right: isTablet ? 12.w : 8.w),
+                      left: isTablet ? 16.0 : 8.w,
+                      top: isTablet ? 16.0 : 8.h,
+                      bottom: isTablet ? 24.0 : 16.h,
+                      right: isTablet ? 16.0 : 8.w),
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: GestureDetector(
@@ -378,7 +378,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                       child: Icon(
                         Icons.arrow_back_ios,
                         color: Colors.white,
-                        size: isTablet ? 28.sp : 24.sp,
+                        size: isTablet ? 32.0 : 24.sp,
                       ),
                     ),
                   ),
@@ -387,12 +387,12 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                 // Filter Pills - Row 1
                 Padding(
                   padding:
-                      EdgeInsets.symmetric(horizontal: isTablet ? 20.w : 16.w),
+                  EdgeInsets.symmetric(horizontal: isTablet ? 24.0 : 16.w),
                   child: Row(
                     children: [
                       Expanded(
                         child: _buildFilterPill(
-                          image: AppImages.global,
+                          image: null, // User requested Flutter icons
                           icon: Icons.language,
                           value: selectedLanguage,
                           items: languages,
@@ -409,11 +409,11 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                           isTablet: isTablet,
                         ),
                       ),
-                      SizedBox(width: isTablet ? 12.w : 8.w),
+                      SizedBox(width: isTablet ? 16.0 : 8.w),
                       Expanded(
                         child: _buildFilterPill(
-                          image: AppImages.language,
-                          icon: Icons.image,
+                          image: null, // User requested Flutter icons
+                          icon: Icons.text_fields, // Better icon for "Script"
                           value: selectedScript,
                           items: scripts,
                           onChanged: (val) {
@@ -433,7 +433,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                   ),
                 ),
 
-                SizedBox(height: isTablet ? 12.h : 10.h),
+                SizedBox(height: isTablet ? 16.0 : 10.h),
 
                 // Filter Pills - Row 2
                 Padding(
@@ -453,15 +453,15 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                             _loadRooms();
                           },
                           hintText: AppLocalizations.country,
-                          imageUrl: AppImages.country,
+                          
                           iconColor: Colors.lightGreenAccent,
                           isTablet: isTablet,
                         ),
                       ),
-                      SizedBox(width: isTablet ? 12.w : 8.w),
+                      SizedBox(width: isTablet ? 16.0 : 8.w),
                       Expanded(
                         child: _buildFilterPill(
-                          image: AppImages.coinStar,
+                          image: null, // User requested Flutter icons
                           icon: Icons.star,
                           value: selectedPoints,
                           items: points,
@@ -482,17 +482,17 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                   ),
                 ),
 
-                SizedBox(height: isTablet ? 12.h : 10.h),
+                SizedBox(height: isTablet ? 16.0 : 10.h),
 
                 // Filter Pills - Row 3
                 Padding(
                   padding:
-                      EdgeInsets.symmetric(horizontal: isTablet ? 20.w : 16.w),
+                  EdgeInsets.symmetric(horizontal: isTablet ? 24.0 : 16.w),
                   child: Row(
                     children: [
                       Expanded(
                         child: _buildMultiSelectCategoryPill(
-                          image: AppImages.category,
+                          image: null, // User requested Flutter icons
                           icon: Icons.category,
                           selectedValues: selectedCategories,
                           items: categories,
@@ -511,10 +511,10 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                           isTablet: isTablet,
                         ),
                       ),
-                      SizedBox(width: isTablet ? 12.w : 8.w),
+                      SizedBox(width: isTablet ? 16.0 : 8.w),
                       Expanded(
                         child: _buildFilterPill(
-                          image: AppImages.game,
+                          image: null, // User requested Flutter icons
                           icon: Icons.people,
                           value: selectedGameMode == "team_vs_team"
                               ? AppLocalizations.team
@@ -549,16 +549,16 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                   ),
                 ),
 
-                SizedBox(height: isTablet ? 20.h : 16.h),
+                SizedBox(height: isTablet ? 24.0 : 16.h),
 
                 // Rooms Container
                 Expanded(
                   child: Container(
                     margin: EdgeInsets.symmetric(
-                        horizontal: isTablet ? 16.w : 12.w),
+                        horizontal: isTablet ? 24.0 : 12.w),
                     padding: EdgeInsets.symmetric(
-                        vertical: isTablet ? 20.h : 16.h,
-                        horizontal: isTablet ? 16.w : 12.w),
+                        vertical: isTablet ? 24.0 : 16.h,
+                        horizontal: isTablet ? 20.0 : 12.w),
                     decoration: BoxDecoration(
                         gradient: const LinearGradient(
                             begin: AlignmentGeometry.topCenter,
@@ -605,28 +605,28 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                                       AppLocalizations.noRoomsAvailable,
                                       style: TextStyle(
                                         color: Colors.white60,
-                                        fontSize: 16.sp,
+                          fontSize: isTablet ? 24.0 : 16.sp, // Increased no rooms text size
                                       ),
                                     ),
                                   )
                                 : ListView.separated(
                                     itemCount: _rooms.length,
                                     separatorBuilder: (_, __) =>
-                                        SizedBox(height: 16.h),
+                          SizedBox(height: isTablet ? 20.0 : 16.h),
                                     itemBuilder: (context, index) {
                                       final room = _rooms[index];
-                                      return _buildRoomCard(room);
+                        return _buildRoomCard(room, isTablet: isTablet);
                                     },
                                   )
                         : Center(
-                            child: Text(
-                              AppLocalizations.selectAllFiltersToViewRooms,
-                              style: TextStyle(
-                                color: Colors.white60,
-                                fontSize: 16.sp,
-                              ),
-                            ),
-                          ),
+                      child: Text(
+                        AppLocalizations.selectAllFiltersToViewRooms,
+                        style: TextStyle(
+                          color: Colors.white60,
+                          fontSize: isTablet ? 20.0 : 16.sp,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 
@@ -661,12 +661,13 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
     final bool isDropdown =
         !isStatic && !isToggle; // True if it should open a menu
 
+    // Increased height and padding for tablet
     return Container(
-      height: isTablet ? 52.h : 45.h,
+      height: isTablet ? 65.0 : 45.h, // Increased height for larger font
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(25.r),
         // Use a subtle gradient/border for styling
-        border: Border.all(color: Colors.white, width: isTablet ? 1.5.w : 1.w),
+        border: Border.all(color: Colors.white, width: isTablet ? 2.0 : 1.w),
         color: const Color(0xFF0E0E0E),
       ),
       child: Material(
@@ -686,36 +687,48 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
 
                       final selected = await showMenu<String>(
                         context: context,
+              // Adjust position: strictly below the button
                         position: RelativeRect.fromLTRB(
                             pos.dx,
                             pos.dy + size.height,
                             pos.dx + size.width,
                             pos.dy + size.height * 2),
-                        color: const Color(0xFF1E2A3A),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                        items: items!.map((item) {
-                          return PopupMenuItem<String>(
-                            value: item,
-                            child: Text(
-                              item,
-                              style: GoogleFonts.lato(
-                                color: Colors.white,
-                                fontSize: 14.sp,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      );
-                      if (selected != null) onChanged!(selected);
-                    }
-                  : onTap, // If it's a static/toggle button, execute the direct onTap
+              // Constraint the menu to match the width of the button
+              constraints: BoxConstraints(
+                minWidth: size.width,
+                maxWidth: size.width,
+              ),
+              color: const Color(0xFF1E2A3A),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              items: items!.map((item) {
+                return PopupMenuItem<String>(
+                  value: item,
+                  // Ensure adequate height/padding for tablet
+                  height: isTablet ? 56.0 : kMinInteractiveDimension,
+                  child: Container(
+                    width: double.infinity, // Take full width inside the item
+                    padding: EdgeInsets.symmetric(horizontal: isTablet ? 12.0 : 0),
+                    child: Text(
+                      item,
+                      style: GoogleFonts.lato(
+                        color: Colors.white,
+                        fontSize: isTablet ? 22.0 : 14.sp, // Tablet font size increased
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            );
+            if (selected != null) onChanged!(selected);
+          }
+              : onTap, // If it's a static/toggle button, execute the direct onTap
 
           child: Padding(
             padding: EdgeInsets.symmetric(
-                horizontal: isTablet ? 14.w : 10.w,
-                vertical: isTablet ? 12.h : 10.h),
+                horizontal: isTablet ? 20.0 : 10.w,
+                vertical: isTablet ? 12.0 : 10.h),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -723,10 +736,15 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                 if (image != null) ...[
                   Image.asset(
                     image,
-                    height: isTablet ? 22.h : 18.h,
-                    width: isTablet ? 22.w : 18.w,
+                    height: isTablet ? 32.0 : 18.h, // Use 32 if image is present
+                    width: isTablet ? 32.0 : 18.w,
                   ),
-                  SizedBox(width: isTablet ? 10.w : 8.w),
+                  SizedBox(width: isTablet ? 12.0 : 8.w),
+                ] else ...[
+                  Icon(icon,
+                      color: iconColor,
+                      size: isTablet ? 32.0 : 18.sp), // Increased icon size
+                  SizedBox(width: isTablet ? 12.0 : 8.w),
                 ],
                 Expanded(
                   child: Text(
@@ -737,16 +755,16 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                     textAlign: TextAlign.left,
                     style: GoogleFonts.lato(
                       color: Colors.white,
-                      fontSize: isTablet ? 15.sp : 13.sp,
+                      fontSize: isTablet ? 22.0 : 13.sp, // Increased font size
                       fontWeight: FontWeight.w600,
                       height: 1.2,
                     ),
                   ),
                 ),
                 if (isDropdown) ...[
-                  SizedBox(width: isTablet ? 8.w : 6.w),
+                  SizedBox(width: isTablet ? 10.0 : 6.w),
                   Icon(Icons.arrow_drop_down,
-                      color: Colors.white70, size: isTablet ? 20.sp : 16.sp),
+                      color: Colors.white70, size: isTablet ? 32.0 : 16.sp), // Increased arrow size
                 ],
               ],
             ),
@@ -774,10 +792,10 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
             : '${selectedValues.length} selected';
 
     return Container(
-      height: isTablet ? 52.h : 45.h,
+      height: isTablet ? 65.0 : 45.h, // Increased height
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(25.r),
-        border: Border.all(color: Colors.white, width: isTablet ? 1.5.w : 1.w),
+        border: Border.all(color: Colors.white, width: isTablet ? 2.0 : 1.w),
         color: const Color(0xFF0E0E0E),
       ),
       child: Material(
@@ -807,8 +825,8 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
               color: Colors.transparent,
               constraints: BoxConstraints(
                 minWidth: size.width,
-                maxWidth: size.width * 1.5,
-                maxHeight: 300.h,
+                maxWidth: size.width,
+                maxHeight: 350.0, // Limit height to avoid overflow
               ),
               items: [
                 PopupMenuItem<List<String>>(
@@ -827,7 +845,8 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                             // Select All / Deselect All buttons
                             Padding(
                               padding: EdgeInsets.symmetric(
-                                  horizontal: 12.w, vertical: 8.h),
+                                  horizontal: isTablet ? 16.0 : 12.w,
+                                  vertical: isTablet ? 12.0 : 8.h),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
@@ -847,7 +866,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                                           : 'Select All',
                                       style: TextStyle(
                                         color: const Color(0xFF4A90E2),
-                                        fontSize: isTablet ? 14.sp : 12.sp,
+                                        fontSize: isTablet ? 18.0 : 12.sp, // Increased font
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -860,7 +879,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                                       'Done',
                                       style: TextStyle(
                                         color: const Color(0xFF4A90E2),
-                                        fontSize: isTablet ? 14.sp : 12.sp,
+                                        fontSize: isTablet ? 18.0 : 12.sp, // Increased font
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -906,25 +925,26 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                                         },
                                         child: Padding(
                                           padding: EdgeInsets.symmetric(
-                                              horizontal: 12.w, vertical: 8.h),
+                                              horizontal: isTablet ? 16.0 : 12.w,
+                                              vertical: isTablet ? 12.0 : 8.h),
                                           child: Row(
                                             children: [
                                               Icon(
                                                 isSelected
                                                     ? Icons.check_box
                                                     : Icons.check_box_outline_blank,
-                                                size: isTablet ? 20.sp : 18.sp,
+                                                size: isTablet ? 28.0 : 18.sp, // Increased check size
                                                 color: isSelected
                                                     ? const Color(0xFF4A90E2)
                                                     : Colors.white54,
                                               ),
-                                              SizedBox(width: 12.w),
+                                              SizedBox(width: isTablet ? 16.0 : 12.w),
                                               Expanded(
                                                 child: Text(
                                                   e,
                                                   style: TextStyle(
                                                     color: Colors.white,
-                                                    fontSize: isTablet ? 15.sp : 13.sp,
+                                                    fontSize: isTablet ? 22.0 : 13.sp, // Increased font
                                                   ),
                                                 ),
                                               ),
@@ -951,8 +971,8 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
           },
           child: Padding(
             padding: EdgeInsets.symmetric(
-                horizontal: isTablet ? 14.w : 10.w,
-                vertical: isTablet ? 12.h : 10.h),
+                horizontal: isTablet ? 20.0 : 10.w,
+                vertical: isTablet ? 12.0 : 10.h),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -960,15 +980,15 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                 if (image != null) ...[
                   Image.asset(
                     image,
-                    height: isTablet ? 22.h : 18.h,
-                    width: isTablet ? 22.w : 18.w,
+                    height: isTablet ? 32.0 : 18.h,
+                    width: isTablet ? 32.0 : 18.w,
                   ),
-                  SizedBox(width: isTablet ? 10.w : 8.w),
+                  SizedBox(width: isTablet ? 12.0 : 8.w),
                 ] else ...[
                   Icon(icon, 
                       color: iconColor, 
-                      size: isTablet ? 22.sp : 18.sp),
-                  SizedBox(width: isTablet ? 10.w : 8.w),
+                      size: isTablet ? 32.0 : 18.sp), // Increased size
+                  SizedBox(width: isTablet ? 12.0 : 8.w),
                 ],
                 Expanded(
                   child: Text(
@@ -979,15 +999,15 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                     textAlign: TextAlign.left,
                     style: GoogleFonts.lato(
                       color: selectedValues.isEmpty ? Colors.white54 : Colors.white,
-                      fontSize: isTablet ? 15.sp : 13.sp,
+                      fontSize: isTablet ? 22.0 : 13.sp, // Increased font
                       fontWeight: FontWeight.w600,
                       height: 1.2,
                     ),
                   ),
                 ),
-                SizedBox(width: isTablet ? 8.w : 6.w),
+                SizedBox(width: isTablet ? 10.0 : 6.w),
                 Icon(Icons.arrow_drop_down,
-                    color: Colors.white70, size: isTablet ? 20.sp : 16.sp),
+                    color: Colors.white70, size: isTablet ? 32.0 : 16.sp), // Increased arrow size
               ],
             ),
           ),
@@ -1079,7 +1099,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
 
   // --- Existing logic (kept for completeness) ---
 
-  Widget _buildRoomCard(RoomModel room) {
+  Widget _buildRoomCard(RoomModel room, {bool isTablet = false}) {
     const Color gradientStartColor =
         Color.fromRGBO(110, 136, 206, 1); // rgba(110, 136, 206, 1)
     const Color gradientEndColor =
@@ -1090,9 +1110,9 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
     return GestureDetector(
       onTap: room.isFull == true ? null : () => _joinRoom(room),
       child: Container(
-        padding: EdgeInsets.all(14.w),
+        padding: EdgeInsets.all(isTablet ? 20.0 : 14.w),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16.r),
+          borderRadius: BorderRadius.circular(isTablet ? 20.0 : 16.r),
           border: BoxBorder.fromLTRB(
             bottom: const BorderSide(
               color: Color.fromRGBO(31, 48, 96, 1),
@@ -1105,10 +1125,10 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
             // Icon Circle
             Container(
               // 1. Outer Container: Applies the Gradient
-              height: 50.h,
-              width: 50.h,
+              height: isTablet ? 70.0 : 50.h,
+              width: isTablet ? 70.0 : 50.h,
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16.r + borderWidth),
+                borderRadius: BorderRadius.circular((isTablet ? 20.0 : 16.r) + borderWidth),
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -1122,24 +1142,24 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                 decoration: BoxDecoration(
                   // Use the original solid background color
                   color: const Color.fromARGB(255, 26, 42, 81),
-                  borderRadius: BorderRadius.circular(16.r),
+                  borderRadius: BorderRadius.circular(isTablet ? 20.0 : 16.r),
                 ),
                 child: Center(
                   child: Image.asset(
                     _getCategoryIcon(room.category ?? 'Animals'),
-                    width: 53.w,
-                    height: 57.h,
+                    width: isTablet ? 74.0 : 53.w,
+                    height: isTablet ? 78.0 : 57.h,
                     errorBuilder: (_, __, ___) => Icon(
                       Icons.category,
                       color: Colors.white,
-                      size: 32.sp,
+                      size: isTablet ? 40.0 : 32.sp,
                     ),
                   ),
                 ),
               ),
             ),
 
-            SizedBox(width: 12.w),
+            SizedBox(width: isTablet ? 16.0 : 12.w),
 
             // Room Details
             Expanded(
@@ -1148,19 +1168,19 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                 children: [
                   // Title Row
                   SizedBox(
-                    height: 24.h,
+                    height: isTablet ? 32.0 : 24.h,
                     child: Row(
                       children: [
                         Text(
                           room.name ?? 'Room',
                           style: TextStyle(
                             color: Colors.white,
-                            fontSize: 16.sp,
+                            fontSize: isTablet ? 20.0 : 16.sp,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         VerticalDivider(
-                          width: 24.h,
+                          width: isTablet ? 32.0 : 24.h,
                           color: const Color.fromRGBO(76, 99, 162, 1),
                         ),
                         (room.gameMode != null &&
@@ -1168,74 +1188,74 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                             ? Text(
                                 '👥vs👥',
                                 style: TextStyle(
-                                  fontSize: 13.sp,
+                            fontSize: isTablet ? 16.0 : 13.sp,
                                   color: const Color.fromRGBO(132, 156, 206, 1),
                                 ),
                               )
                             : Text(
                                 '👤vs👤',
                                 style: TextStyle(
-                                  fontSize: 13.sp,
+                            fontSize: isTablet ? 16.0 : 13.sp,
                                   color: const Color.fromRGBO(132, 156, 206, 1),
                                 ),
                               ),
                         SizedBox(
-                          width: 15.w,
+                          width: isTablet ? 20.0 : 15.w,
                         ),
                         Text(
-                          _getCountryFlag(room.country),
-                          style: TextStyle(fontSize: 16.sp),
+                          _getCountryFlag(room.country ?? 'India'),
+                          style: TextStyle(fontSize: isTablet ? 20.0 : 16.sp),
                         ),
                         const Spacer(),
                         if (room.voiceEnabled == true) ...[
-                          SizedBox(height: 8.h),
+                          SizedBox(height: isTablet ? 10.0 : 8.h),
                           Icon(
                             Icons.mic,
                             color: const Color.fromRGBO(132, 156, 206, 1),
-                            size: 20.sp,
+                            size: isTablet ? 24.0 : 20.sp,
                           ),
                         ],
                       ],
                     ),
                   ),
-                  SizedBox(height: 8.h),
+                  SizedBox(height: isTablet ? 10.0 : 8.h),
                   // Info Row
                   SizedBox(
-                    height: 24.h,
+                    height: isTablet ? 32.0 : 24.h,
                     child: Row(
                       children: [
                         Icon(Icons.people,
                             color: const Color.fromRGBO(132, 156, 206, 1),
-                            size: 14.sp),
+                            size: isTablet ? 18.0 : 14.sp),
                         SizedBox(width: 4.w),
                         Text(
                           '${room.participantCount}/${room.maxPlayers}',
                           style: TextStyle(
                             color: const Color.fromRGBO(132, 156, 206, 1),
-                            fontSize: 13.sp,
+                            fontSize: isTablet ? 16.0 : 13.sp,
                           ),
                         ),
-                        SizedBox(width: 12.w),
+                        SizedBox(width: isTablet ? 16.0 : 12.w),
                         Icon(Icons.star,
                             color: const Color.fromRGBO(132, 156, 206, 1),
-                            size: 14.sp),
+                            size: isTablet ? 18.0 : 14.sp),
                         SizedBox(width: 4.w),
                         Text(
                           '${room.pointsTarget}',
                           style: TextStyle(
                             color: const Color.fromRGBO(132, 156, 206, 1),
-                            fontSize: 13.sp,
+                            fontSize: isTablet ? 16.0 : 13.sp,
                           ),
                         ),
-                        SizedBox(width: 30.w),
+                        SizedBox(width: isTablet ? 40.0 : 30.w),
                         _buildBadge(
                             room.language?.substring(0, 2).toUpperCase() ??
-                                'EN'),
+                                'EN', isTablet: isTablet),
                         const VerticalDivider(
                             color: Color.fromRGBO(132, 156, 206, 1),
                             thickness: 1),
                         _buildBadge(
-                            room.script?.substring(0, 2).toUpperCase() ?? 'TE'),
+                            room.script?.substring(0, 2).toUpperCase() ?? 'TE', isTablet: isTablet),
                       ],
                     ),
                   ),
@@ -1252,14 +1272,14 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
 
 
 
-  Widget _buildBadge(String text) {
+  Widget _buildBadge(String text, {bool isTablet = false}) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+      padding: EdgeInsets.symmetric(horizontal: isTablet ? 10.0 : 8.w, vertical: isTablet ? 4.0 : 2.h),
       child: Text(
         text,
         style: TextStyle(
           color: const Color.fromRGBO(148, 175, 231, 1),
-          fontSize: 11.sp,
+          fontSize: isTablet ? 14.0 : 11.sp,
           fontWeight: FontWeight.w600,
         ),
       ),
