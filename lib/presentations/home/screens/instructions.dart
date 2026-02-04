@@ -6,6 +6,7 @@ import 'package:inkbattle_frontend/utils/preferences/local_preferences.dart';
 import 'package:inkbattle_frontend/widgets/custom_svg.dart';
 import 'package:inkbattle_frontend/utils/lang.dart';
 import 'package:inkbattle_frontend/widgets/persistent_banner_ad_widget.dart';
+import 'dart:developer' as developer;
 
 class InstructionsScreen extends StatefulWidget {
   const InstructionsScreen({super.key});
@@ -15,7 +16,7 @@ class InstructionsScreen extends StatefulWidget {
 }
 
 class _InstructionsScreenState extends State<InstructionsScreen> {
-  
+  final String _logTag = 'InstructionsScreen';
   // REMOVED: Ad variables
   // BannerAd? _bannerAd;
   // bool _isBannerAdLoaded = false;

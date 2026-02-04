@@ -11,7 +11,9 @@ import 'package:inkbattle_frontend/widgets/blue_background_scaffold.dart';
 import 'package:inkbattle_frontend/widgets/custom_svg.dart';
 import 'package:inkbattle_frontend/widgets/text_widget.dart';
 import 'package:inkbattle_frontend/widgets/persistent_banner_ad_widget.dart';
+import 'package:inkbattle_frontend/widgets/country_picker_widget.dart'; // Add this import
 import 'package:google_fonts/google_fonts.dart'; // Added for typography
+import 'widgets/selection_bottom_sheet.dart';
 
 class RoomPreferencesScreen extends StatefulWidget {
   const RoomPreferencesScreen({super.key});
@@ -407,16 +409,12 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
               padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
               child: Row(
                 children: [
-                   GestureDetector(
+                  GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: Container(
+                    child: Padding(
                       padding: EdgeInsets.all(8.w),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
                       child: Icon(
-                        Icons.arrow_back,
+                        Icons.arrow_back_ios, // Use simple arrow as requested
                         color: Colors.white,
                         size: 24.sp,
                       ),
@@ -426,8 +424,8 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
                     child: Center(
                       child: Text(
                         AppLocalizations.randomMatch,
-                        style: GoogleFonts.orbitron( // Game font
-                          fontSize: 24.sp, // Reduced from 26.sp
+                        style: GoogleFonts.russoOne( // Updated font
+                          fontSize: 24.sp,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                           shadows: [
@@ -441,7 +439,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
                       ),
                     ),
                   ),
-                  SizedBox(width: 60.w), // Balance back button
+                  SizedBox(width: 40.w), // Adjusted balance spacing
                 ],
               ),
             ),
@@ -455,8 +453,8 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
                   constraints: BoxConstraints(maxWidth: 500.w), // Re-introduced constraint
                   child: SizedBox(
                     width: MediaQuery.of(context).size.width > 600
-                          ? 480
-                          : 0.82.sw, // was 0.9
+                          ? 550 // Increased max width for tablet
+                          : 0.98.sw, // Increased width (reduced margins)
                     child: SingleChildScrollView(
                       physics: const BouncingScrollPhysics(),
                       child: Column(
@@ -474,12 +472,16 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
                           SizedBox(height: 20.h),
 
                           // Country
-                          _buildGradientDropdown(
-                            hint: AppLocalizations.country,
-                            value: selectedCountry,
-                            items: countries,
-                            iconData: Icons.public,
-                            onChanged: (v) => setState(() => selectedCountry = v),
+                          // Country
+                          // Country
+                          CountryPickerWidget(
+                            selectedCountryCode: selectedCountry,
+                            onCountrySelected: (code) => setState(() => selectedCountry = code),
+                            hintText: AppLocalizations.country,
+                            icon: Icons.public,
+                            iconColor: const Color(0xFF09BDFF),
+                            useGradientDesign: true,
+                            height: 58.h, // Explicit height to match other fields
                           ),
                           SizedBox(height: 20.h),
 
@@ -524,52 +526,112 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
     );
   }
 
+  // Widget _buildJoinButton() {
+  //   return Container(
+  //     width: double.infinity, // Fills the constrained parent
+  //     height: 58.h, // Reduced from 65.h
+  //     decoration: BoxDecoration(
+  //       gradient: const LinearGradient(
+  //         colors: [
+  //           Color(0xFF00C6FF), // Cyan
+  //           Color(0xFF0072FF), // Blue
+  //         ],
+  //       ),
+  //       borderRadius: BorderRadius.circular(15.r), // Match dropdown radius
+  //       boxShadow: [
+  //         BoxShadow(
+  //           color: const Color(0xFF0072FF).withOpacity(0.5),
+  //           blurRadius: 20,
+  //           offset: const Offset(0, 5),
+  //         ),
+  //       ],
+  //     ),
+  //     child: ElevatedButton(
+  //       style: ElevatedButton.styleFrom(
+  //         padding: EdgeInsets.zero, // Remove default padding
+  //         backgroundColor: Colors.transparent,
+  //         shadowColor: Colors.transparent,
+  //         shape: RoundedRectangleBorder(
+  //           borderRadius: BorderRadius.circular(15.r),
+  //         ),
+  //       ),
+  //       onPressed: _isLoading ? null : _handlePlayRandom,
+  //       child: Center(
+  //         child: _isLoading
+  //             ? const CircularProgressIndicator(color: Colors.white)
+  //             : Text(
+  //           AppLocalizations.playRandomCoins,
+  //           textAlign: TextAlign.center,
+  //           style: GoogleFonts.exo2(
+  //             fontSize: 18.sp, // Kept readable size for button
+  //             fontWeight: FontWeight.bold,
+  //             color: Colors.white,
+  //           ),
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
+
   Widget _buildJoinButton() {
-    return Container(
-      width: double.infinity, // Fills the constrained parent
-      height: 58.h, // Reduced from 65.h
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF00C6FF), // Cyan
-            Color(0xFF0072FF), // Blue
-          ],
-        ),
-        borderRadius: BorderRadius.circular(15.r), // Match dropdown radius
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0072FF).withOpacity(0.5),
-            blurRadius: 20,
-            offset: const Offset(0, 5),
-          ),
-        ],
+  return Container(
+    width: double.infinity,
+    height: 58.h,
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0xFF00C6FF), Color(0xFF0072FF)],
       ),
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          padding: EdgeInsets.zero, // Remove default padding
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15.r),
-          ),
+      borderRadius: BorderRadius.circular(15.r),
+      boxShadow: [
+        BoxShadow(
+          color: const Color(0xFF0072FF).withOpacity(0.5),
+          blurRadius: 20,
+          offset: const Offset(0, 5),
         ),
-        onPressed: _isLoading ? null : _handlePlayRandom,
-        child: Center(
-          child: _isLoading
-              ? const CircularProgressIndicator(color: Colors.white)
-              : Text(
-            AppLocalizations.playRandomCoins,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.exo2(
-              fontSize: 18.sp, // Kept readable size for button
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+      ],
+    ),
+    child: ElevatedButton(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.transparent,
+        shadowColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15.r)),
+      ),
+      onPressed: _isLoading ? null : _handlePlayRandom,
+      child: _isLoading
+          ? const CircularProgressIndicator(color: Colors.white)
+          : Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                  // Removed text "Play Random" as requested
+                  // Text(
+                  //   "Play Random", 
+                  //   style: GoogleFonts.exo2(
+                  //     fontSize: 18.sp,
+                  //     fontWeight: FontWeight.bold,
+                  //     color: Colors.white,
+                  //   ),
+                  // ),
+                  // SizedBox(width: 8.w),
+                // Replace with your coin SVG or Icon
+                Image.asset(
+                  AppImages.coin, // Ensure this path exists in your constants
+                  width: 20.w,
+                  height: 20.w,
+                ),
+                SizedBox(width: 4.w),
+                Text(
+                  "250",
+                  style: GoogleFonts.exo2(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildGradientDropdown({
     required String hint,
@@ -578,8 +640,6 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
     required IconData iconData,
     required ValueChanged<String?> onChanged,
   }) {
-    final GlobalKey tapKey = GlobalKey();
-
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -595,7 +655,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
       ),
       padding: const EdgeInsets.all(1.2), // Border width
       child: Container(
-        height: 58.h, // Reduced from 65.h
+        height: 58.h, // Match other fields height
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.7),
           borderRadius: BorderRadius.circular(14.r),
@@ -603,55 +663,34 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
         child: Material(
           color: Colors.transparent,
           child: InkWell(
-            key: tapKey,
             borderRadius: BorderRadius.circular(13.r),
             onTap: () async {
-              final box = tapKey.currentContext!.findRenderObject() as RenderBox;
-              final Offset pos = box.localToGlobal(Offset.zero);
-              final Size size = box.size;
-
-              final selected = await showMenu<String>(
+              FocusScope.of(context).unfocus();
+              final result = await showModalBottomSheet<String>(
                 context: context,
-                position: RelativeRect.fromLTRB(
-                  pos.dx,
-                  pos.dy + size.height + 5,
-                  pos.dx + size.width,
-                  pos.dy + size.height + 5,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => SelectionBottomSheet(
+                  title: hint,
+                  items: items,
+                  selectedItem: value,
                 ),
-                color: const Color(0xFF1E1E2C), // Dark dropdown bg
-                surfaceTintColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: const BorderSide(color: Color(0xFF09BDFF), width: 1),
-                ),
-                constraints: BoxConstraints(
-                  minWidth: size.width,
-                  maxWidth: size.width,
-                  maxHeight: 300,
-                ),
-                items: items.map((e) {
-                  return PopupMenuItem<String>(
-                    value: e,
-                    child: Text(
-                      e,
-                      style: GoogleFonts.lato(color: Colors.white),
-                    ),
-                  );
-                }).toList(),
               );
-              if (selected != null) onChanged(selected);
+              if (result != null) {
+                onChanged(result);
+              }
             },
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center, // Ensured center alignment
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Icon(
                     iconData,
                     color: const Color(0xFF09BDFF),
-                    size: 24.sp, // Reduced from 28.sp
+                    size: 24.sp, // Match other fields icon size
                   ),
-                  SizedBox(width: 15.w), // Slightly reduced spacing
+                  SizedBox(width: 15.w),
                   Expanded(
                     child: Text(
                       value ?? hint,
@@ -659,14 +698,14 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
                       maxLines: 1,
                       style: GoogleFonts.lato(
                         color: value == null ? Colors.white54 : Colors.white,
-                        fontSize: 16.sp, // Reduced from 18.sp
+                        fontSize: 16.sp, // Match other fields font size
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
                   Icon(
                     Icons.keyboard_arrow_down_rounded,
-                    size: 24.sp, // Reduced from 30.sp
+                    size: 24.sp,
                     color: Colors.white70,
                   ),
                 ],
@@ -679,3 +718,4 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
   }
 }
 
+  

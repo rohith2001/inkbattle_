@@ -11,6 +11,8 @@ import 'package:inkbattle_frontend/models/room_model.dart';
 import 'package:inkbattle_frontend/utils/lang.dart';
 import 'package:inkbattle_frontend/widgets/persistent_banner_ad_widget.dart';
 import 'package:inkbattle_frontend/widgets/country_picker_widget.dart';
+import 'package:inkbattle_frontend/presentations/room_preferences/widgets/selection_bottom_sheet.dart';
+import 'package:inkbattle_frontend/presentations/room_preferences/widgets/multi_selection_bottom_sheet.dart';
 import 'dart:developer' as developer;
 
 class MultiplayerScreen extends StatefulWidget {
@@ -438,7 +440,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                 // Filter Pills - Row 2
                 Padding(
                   padding:
-                      EdgeInsets.symmetric(horizontal: isTablet ? 20.w : 16.w),
+                      EdgeInsets.symmetric(horizontal: isTablet ? 24.0 : 16.w),
                   child: Row(
                     children: [
                       Expanded(
@@ -453,7 +455,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                             _loadRooms();
                           },
                           hintText: AppLocalizations.country,
-                          
+                          height: isTablet ? 65.0 : 45.h, // Explicit height to match other fields
                           iconColor: Colors.lightGreenAccent,
                           isTablet: isTablet,
                         ),
@@ -679,51 +681,23 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
               ? null
               : isDropdown
                   ? () async {
-                      // If it's a dropdown, show the menu
-                      final box = tapKey.currentContext!.findRenderObject()
-                          as RenderBox;
-                      final Offset pos = box.localToGlobal(Offset.zero);
-                      final Size size = box.size;
-
-                      final selected = await showMenu<String>(
+                      // If it's a dropdown, show the bottom sheet
+                      FocusScope.of(context).unfocus();
+                      final result = await showModalBottomSheet<String>(
                         context: context,
-              // Adjust position: strictly below the button
-                        position: RelativeRect.fromLTRB(
-                            pos.dx,
-                            pos.dy + size.height,
-                            pos.dx + size.width,
-                            pos.dy + size.height * 2),
-              // Constraint the menu to match the width of the button
-              constraints: BoxConstraints(
-                minWidth: size.width,
-                maxWidth: size.width,
-              ),
-              color: const Color(0xFF1E2A3A),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.r),
-              ),
-              items: items!.map((item) {
-                return PopupMenuItem<String>(
-                  value: item,
-                  // Ensure adequate height/padding for tablet
-                  height: isTablet ? 56.0 : kMinInteractiveDimension,
-                  child: Container(
-                    width: double.infinity, // Take full width inside the item
-                    padding: EdgeInsets.symmetric(horizontal: isTablet ? 12.0 : 0),
-                    child: Text(
-                      item,
-                      style: GoogleFonts.lato(
-                        color: Colors.white,
-                        fontSize: isTablet ? 22.0 : 14.sp, // Tablet font size increased
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            );
-            if (selected != null) onChanged!(selected);
-          }
-              : onTap, // If it's a static/toggle button, execute the direct onTap
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (context) => SelectionBottomSheet(
+                          title: hintText,
+                          items: items ?? [],
+                          selectedItem: value,
+                        ),
+                      );
+                      if (result != null && onChanged != null) {
+                        onChanged(result);
+                      }
+                    }
+                  : onTap, // If it's a static/toggle button, execute the direct onTap
 
           child: Padding(
             padding: EdgeInsets.symmetric(
@@ -763,7 +737,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                 ),
                 if (isDropdown) ...[
                   SizedBox(width: isTablet ? 10.0 : 6.w),
-                  Icon(Icons.arrow_drop_down,
+                  Icon(Icons.keyboard_arrow_down_rounded, // Improved icon
                       color: Colors.white70, size: isTablet ? 32.0 : 16.sp), // Increased arrow size
                 ],
               ],
@@ -804,169 +778,19 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
           key: tapKey,
           borderRadius: BorderRadius.circular(25.r),
           onTap: () async {
-            final box = tapKey.currentContext?.findRenderObject() as RenderBox?;
-            if (box == null) return;
-            
-            final Offset position = box.localToGlobal(Offset.zero);
-            final Size size = box.size;
-            const double gap = -2.0;
-            
-            // Initialize tempSelected BEFORE showing the menu
-            List<String> tempSelected = List.from(selectedValues);
-            
-            final selected = await showMenu<List<String>>(
+            FocusScope.of(context).unfocus();
+            final result = await showModalBottomSheet<List<String>>(
               context: context,
-              position: RelativeRect.fromLTRB(
-                position.dx,
-                position.dy + size.height + gap,
-                position.dx + size.width,
-                position.dy + size.height + gap,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) => MultiSelectionBottomSheet(
+                title: hintText,
+                items: items,
+                selectedItems: selectedValues,
               ),
-              color: Colors.transparent,
-              constraints: BoxConstraints(
-                minWidth: size.width,
-                maxWidth: size.width,
-                maxHeight: 350.0, // Limit height to avoid overflow
-              ),
-              items: [
-                PopupMenuItem<List<String>>(
-                  enabled: false,
-                  padding: EdgeInsets.zero,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12.r),
-                      color: const Color(0xFF1A2942),
-                    ),
-                    child: StatefulBuilder(
-                      builder: (context, setMenuState) {
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            // Select All / Deselect All buttons
-                            Padding(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: isTablet ? 16.0 : 12.w,
-                                  vertical: isTablet ? 12.0 : 8.h),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  InkWell(
-                                    onTap: () {
-                                      setMenuState(() {
-                                        if (tempSelected.length == items.length) {
-                                          tempSelected.clear();
-                                        } else {
-                                          tempSelected = List.from(items);
-                                        }
-                                      });
-                                    },
-                                    child: Text(
-                                      tempSelected.length == items.length
-                                          ? 'Deselect All'
-                                          : 'Select All',
-                                      style: TextStyle(
-                                        color: const Color(0xFF4A90E2),
-                                        fontSize: isTablet ? 18.0 : 12.sp, // Increased font
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                  InkWell(
-                                    onTap: () {
-                                      Navigator.pop(context, tempSelected);
-                                    },
-                                    child: Text(
-                                      'Done',
-                                      style: TextStyle(
-                                        color: const Color(0xFF4A90E2),
-                                        fontSize: isTablet ? 18.0 : 12.sp, // Increased font
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Divider(
-                              color: Colors.white.withOpacity(0.2),
-                              height: 1,
-                            ),
-                            // Category items with checkboxes
-                            Flexible(
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: items.asMap().entries.map((entry) {
-                                    final index = entry.key;
-                                    final e = entry.value;
-                                    final isSelected = tempSelected.contains(e);
-                                    
-                                    return Container(
-                                      decoration: index < items.length - 1
-                                          ? const BoxDecoration(
-                                              border: Border(
-                                                bottom: BorderSide(
-                                                  color: Color.fromRGBO(
-                                                      255, 255, 255, 0.2),
-                                                  width: 1,
-                                                ),
-                                              ),
-                                            )
-                                          : null,
-                                      child: InkWell(
-                                        onTap: () {
-                                          setMenuState(() {
-                                            if (isSelected) {
-                                              tempSelected.remove(e);
-                                            } else {
-                                              tempSelected.add(e);
-                                            }
-                                          });
-                                        },
-                                        child: Padding(
-                                          padding: EdgeInsets.symmetric(
-                                              horizontal: isTablet ? 16.0 : 12.w,
-                                              vertical: isTablet ? 12.0 : 8.h),
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                isSelected
-                                                    ? Icons.check_box
-                                                    : Icons.check_box_outline_blank,
-                                                size: isTablet ? 28.0 : 18.sp, // Increased check size
-                                                color: isSelected
-                                                    ? const Color(0xFF4A90E2)
-                                                    : Colors.white54,
-                                              ),
-                                              SizedBox(width: isTablet ? 16.0 : 12.w),
-                                              Expanded(
-                                                child: Text(
-                                                  e,
-                                                  style: TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: isTablet ? 22.0 : 13.sp, // Increased font
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ],
             );
-            if (selected != null) {
-              onChanged(selected);
+            if (result != null) {
+              onChanged(result);
             }
           },
           child: Padding(
@@ -1006,7 +830,7 @@ class _MultiplayerScreenState extends State<MultiplayerScreen> {
                   ),
                 ),
                 SizedBox(width: isTablet ? 10.0 : 6.w),
-                Icon(Icons.arrow_drop_down,
+                Icon(Icons.keyboard_arrow_down_rounded,
                     color: Colors.white70, size: isTablet ? 32.0 : 16.sp), // Increased arrow size
               ],
             ),
