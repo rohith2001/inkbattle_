@@ -1,37 +1,44 @@
 import 'package:flutter/material.dart';
-// Needed for DiagnosticableTreeMixin
 
-// 1. Custom Thumb Shape: White ring with a black center dot
+/// ------------------------------------------------------------
+/// Responsive Scale Helper
+/// ------------------------------------------------------------
+double _sliderScale() {
+  final width =
+      MediaQueryData.fromWindow(WidgetsBinding.instance.window)
+          .size
+          .width;
+  return width > 600 ? 1.25 : 1.0;
+}
 
-// NOTE: Assuming CustomTrackWithEndCaps and EndIconShape are defined elsewhere.
-
+/// ------------------------------------------------------------
+/// 1. Custom Thumb Shape
+/// ------------------------------------------------------------
 class RoundSliderWithBorderThumb extends SliderComponentShape {
   final double thumbRadius;
   final Color outerColor;
   final Color internalBorderColor;
   final Color innerColor;
 
-  // CHANGED: Make these double fields nullable (double?)
   final double? internalBorderWidth;
   final double? innerCircleRadius;
   final double? borderWidth;
 
-  const RoundSliderWithBorderThumb(
-      {required this.thumbRadius,
-      this.outerColor = Colors.white,
-      this.internalBorderColor = Colors.white,
-      this.innerColor = Colors.black,
-      // Note: We don't need default values here, but keeping them for consistency
-      // is harmless if the fields are nullable.
-      this.internalBorderWidth = 2.0,
-      this.borderWidth = 2.0,
-      this.innerCircleRadius = 3.0});
+  const RoundSliderWithBorderThumb({
+    required this.thumbRadius,
+    this.outerColor = Colors.white,
+    this.internalBorderColor = Colors.white,
+    this.innerColor = Colors.black,
+    this.internalBorderWidth = 2.0,
+    this.borderWidth = 2.0,
+    this.innerCircleRadius = 3.0,
+  });
 
   @override
   Size getPreferredSize(bool isEnabled, bool isDiscrete) {
-    // Use null-aware operator to safely access borderWidth
-    final double safeBorderWidth = borderWidth ?? 2.0;
-    return Size.fromRadius(thumbRadius + safeBorderWidth);
+    final scale = _sliderScale();
+    final safeBorderWidth = (borderWidth ?? 2.0) * scale;
+    return Size.fromRadius((thumbRadius * scale) + safeBorderWidth);
   }
 
   @override
@@ -50,65 +57,79 @@ class RoundSliderWithBorderThumb extends SliderComponentShape {
     required double value,
   }) {
     final Canvas canvas = context.canvas;
+    final scale = _sliderScale();
 
-    // Use null-aware operators to provide fallback values for safety
-    final double safeBorderWidth = borderWidth ?? 2.0;
-    final double safeInternalBorderWidth = internalBorderWidth ?? 2.0;
-    final double safeInnerCircleRadius = innerCircleRadius ?? 3.0;
+    final safeBorderWidth = (borderWidth ?? 2.0) * scale;
+    final safeInternalBorderWidth =
+        (internalBorderWidth ?? 2.0) * scale;
+    final safeInnerCircleRadius =
+        (innerCircleRadius ?? 3.0);
 
-    final Color thumbFillColor = sliderTheme.thumbColor ?? Colors.black;
+    final scaledRadius = thumbRadius * scale;
 
-    // 1. Draw the OUTER border/ring (White in your SVG)
-    final Paint outerPaint = Paint()
+    final Color thumbFillColor =
+        sliderTheme.thumbColor ?? Colors.black;
+
+    /// OUTER RING
+    final outerPaint = Paint()
       ..color = outerColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = safeBorderWidth; // Use safe value
+      ..strokeWidth = safeBorderWidth;
 
     canvas.drawCircle(
-        center, thumbRadius + (safeBorderWidth / 2.0), outerPaint);
+        center, scaledRadius + safeBorderWidth / 2, outerPaint);
 
-    // 2. Draw the PRIMARY INNER FILL
-    final Paint innerFillPaint = Paint()
+    /// INNER FILL
+    final innerFillPaint = Paint()
       ..color = thumbFillColor
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(center, thumbRadius, innerFillPaint);
 
-    // 3. Draw the SECONDARY INTERNAL BORDER
-    final Paint internalBorderPaint = Paint()
+    canvas.drawCircle(center, scaledRadius, innerFillPaint);
+
+    /// INTERNAL BORDER
+    final internalBorderPaint = Paint()
       ..color = internalBorderColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = safeInternalBorderWidth; // Use safe value
+      ..strokeWidth = safeInternalBorderWidth;
 
     canvas.drawCircle(
       center,
-      thumbRadius - safeInternalBorderWidth,
+      scaledRadius - safeInternalBorderWidth,
       internalBorderPaint,
     );
 
-    // 4. Draw the CENTER DOT (Innermost fill)
-    final Paint centerPaint = Paint()
+    /// CENTER DOT
+    final centerPaint = Paint()
       ..color = innerColor
       ..style = PaintingStyle.fill;
 
-    // Use safe value for division
-    final double centerRadius =
-        thumbRadius / (safeInnerCircleRadius > 0 ? safeInnerCircleRadius : 1.0);
+    final centerRadius =
+        scaledRadius / (safeInnerCircleRadius > 0
+            ? safeInnerCircleRadius
+            : 1.0);
+
     canvas.drawCircle(center, centerRadius, centerPaint);
   }
 }
 
-// 2. Custom End Icon for the track (Large solid circle or small dot)
+/// ------------------------------------------------------------
+/// 2. End Icon Shape
+/// ------------------------------------------------------------
 class EndIconShape extends SliderComponentShape {
   final double radius;
   final Color color;
 
-  const EndIconShape({required this.radius, required this.color});
+  const EndIconShape({
+    required this.radius,
+    required this.color,
+  });
 
   @override
-  Size getPreferredSize(bool isEnabled, bool isDiscrete) =>
-      Size.fromRadius(radius);
+  Size getPreferredSize(bool isEnabled, bool isDiscrete) {
+    final scale = _sliderScale();
+    return Size.fromRadius(radius * scale);
+  }
 
-  // CORRECTED SIGNATURE for SliderComponentShape.paint (Removing 'required Thumb thumb')
   @override
   void paint(
     PaintingContext context,
@@ -123,14 +144,17 @@ class EndIconShape extends SliderComponentShape {
     required TextDirection textDirection,
     required double textScaleFactor,
     required double value,
-    // Removed: required Thumb thumb, // Removed to fix latest Dart/Flutter override error
   }) {
-    final Paint paint = Paint()..color = color;
-    context.canvas.drawCircle(center, radius, paint);
+    final scale = _sliderScale();
+
+    final paint = Paint()..color = color;
+    context.canvas.drawCircle(center, radius * scale, paint);
   }
 }
 
-// 3. Custom Track Shape to draw Icons outside the slider bounds
+/// ------------------------------------------------------------
+/// 3. Custom Track with End Caps
+/// ------------------------------------------------------------
 class CustomTrackWithEndCaps extends RectangularSliderTrackShape {
   final SliderComponentShape? leftCap;
   final SliderComponentShape? rightCap;
@@ -148,15 +172,16 @@ class CustomTrackWithEndCaps extends RectangularSliderTrackShape {
     required RenderBox parentBox,
     required SliderThemeData sliderTheme,
   }) {
-    final double trackHeight = sliderTheme.trackHeight ?? 4.0;
+    final trackHeight = sliderTheme.trackHeight ?? 4.0;
+    final scale = _sliderScale();
 
-    // IMPORTANT: Reserve space for caps inside the container
-    const double capPadding = 20.0;
+    final capPadding = 20.0 * scale;
 
-    final double trackLeft = offset.dx + capPadding;
-    final double trackRight = offset.dx + parentBox.size.width - capPadding;
+    final trackLeft = offset.dx + capPadding;
+    final trackRight =
+        offset.dx + parentBox.size.width - capPadding;
 
-    final double trackTop =
+    final trackTop =
         offset.dy + (parentBox.size.height - trackHeight) / 2;
 
     return Rect.fromLTRB(
@@ -181,7 +206,6 @@ class CustomTrackWithEndCaps extends RectangularSliderTrackShape {
     bool isEnabled = false,
     double additionalActiveTrackHeight = 0,
   }) {
-    // draw track
     super.paint(
       context,
       offset,
@@ -195,6 +219,8 @@ class CustomTrackWithEndCaps extends RectangularSliderTrackShape {
       isEnabled: isEnabled,
     );
 
+    final scale = _sliderScale();
+
     final Rect trackRect = getPreferredRect(
       parentBox: parentBox,
       sliderTheme: sliderTheme,
@@ -203,51 +229,44 @@ class CustomTrackWithEndCaps extends RectangularSliderTrackShape {
       offset: offset,
     );
 
-    /// spacing BETWEEN the track and caps
-    const double capSpacing = 10.0;
+    final capSpacing = 10.0 * scale;
 
-    final Offset leftCenter =
+    final leftCenter =
         Offset(trackRect.left - capSpacing, trackRect.center.dy);
 
-    final Offset rightCenter =
+    final rightCenter =
         Offset(trackRect.right + capSpacing, trackRect.center.dy);
 
-    const Size dummySize = Size.zero;
+    const dummySize = Size.zero;
 
-    // paint left
-    if (leftCap != null) {
-      leftCap!.paint(
-        context,
-        leftCenter,
-        activationAnimation: enableAnimation,
-        enableAnimation: enableAnimation,
-        isDiscrete: isDiscrete,
-        labelPainter: TextPainter(),
-        parentBox: parentBox,
-        sizeWithOverflow: dummySize,
-        sliderTheme: sliderTheme,
-        textDirection: textDirection,
-        textScaleFactor: 1.0,
-        value: 0.0,
-      );
-    }
+    leftCap?.paint(
+      context,
+      leftCenter,
+      activationAnimation: enableAnimation,
+      enableAnimation: enableAnimation,
+      isDiscrete: isDiscrete,
+      labelPainter: TextPainter(),
+      parentBox: parentBox,
+      sizeWithOverflow: dummySize,
+      sliderTheme: sliderTheme,
+      textDirection: textDirection,
+      textScaleFactor: 1,
+      value: 0,
+    );
 
-    // paint right
-    if (rightCap != null) {
-      rightCap!.paint(
-        context,
-        rightCenter,
-        activationAnimation: enableAnimation,
-        enableAnimation: enableAnimation,
-        isDiscrete: isDiscrete,
-        labelPainter: TextPainter(),
-        parentBox: parentBox,
-        sizeWithOverflow: dummySize,
-        sliderTheme: sliderTheme,
-        textDirection: textDirection,
-        textScaleFactor: 1.0,
-        value: 1.0,
-      );
-    }
+    rightCap?.paint(
+      context,
+      rightCenter,
+      activationAnimation: enableAnimation,
+      enableAnimation: enableAnimation,
+      isDiscrete: isDiscrete,
+      labelPainter: TextPainter(),
+      parentBox: parentBox,
+      sizeWithOverflow: dummySize,
+      sliderTheme: sliderTheme,
+      textDirection: textDirection,
+      textScaleFactor: 1,
+      value: 1,
+    );
   }
 }

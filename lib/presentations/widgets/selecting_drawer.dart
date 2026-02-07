@@ -8,31 +8,47 @@ class DrawerSelectionRoller extends StatefulWidget {
   final Map<String, dynamic> selectedDrawerInfo;
   final String gifPath;
   final VoidCallback onAnimationComplete;
+
   const DrawerSelectionRoller({
     super.key,
     required this.participants,
-    required this.onAnimationComplete, // <<< NEW
-
+    required this.onAnimationComplete,
     required this.selectedDrawerInfo,
     required this.gifPath,
   });
 
   @override
-  State<DrawerSelectionRoller> createState() => _DrawerSelectionRollerState();
+  State<DrawerSelectionRoller> createState() =>
+      _DrawerSelectionRollerState();
 }
 
 class _DrawerSelectionRollerState extends State<DrawerSelectionRoller> {
   late ScrollController _scrollController;
   bool _didAnimate = false;
 
-  final double pillHeight = 46.h;
-  final double spacing = 8.h;
+  double pillHeight = 46.h;
+  double spacing = 8.h;
+  double avatarSize = 32.w;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _startRolling());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _configureSizes();
+      _startRolling();
+    });
+  }
+
+  void _configureSizes() {
+    final bool isTablet =
+        MediaQuery.of(context).size.width > 600;
+
+    if (isTablet) {
+      pillHeight = 60.h;
+      spacing = 10.h;
+      avatarSize = 40.w;
+    }
   }
 
   @override
@@ -42,7 +58,7 @@ class _DrawerSelectionRollerState extends State<DrawerSelectionRoller> {
   }
 
   // ----------------------------------------------------------
-  // 🔥 Rolling Logic
+  // Rolling Logic
   // ----------------------------------------------------------
   Future<void> _startRolling() async {
     if (_didAnimate || widget.participants.isEmpty) return;
@@ -69,20 +85,26 @@ class _DrawerSelectionRollerState extends State<DrawerSelectionRoller> {
       duration: const Duration(milliseconds: 2200),
       curve: Curves.easeOutCubic,
     );
+
     if (mounted) widget.onAnimationComplete();
   }
 
   @override
   Widget build(BuildContext context) {
-    final double pillWidth = 160.w;
+    final bool isTablet =
+        MediaQuery.of(context).size.width > 600;
+
+    final double pillWidth = isTablet ? 220.w : 160.w;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(Icons.play_arrow, color: Colors.white, size: 24.h),
+        Icon(Icons.play_arrow,
+            color: Colors.white,
+            size: isTablet ? 28.h : 24.h),
+
         SizedBox(width: 10.w),
 
-        // Outer fixed cyan pill
         Container(
           width: pillWidth,
           height: pillHeight,
@@ -97,9 +119,6 @@ class _DrawerSelectionRollerState extends State<DrawerSelectionRoller> {
     );
   }
 
-  // ----------------------------------------------------------
-  // 🔥 Only this part scrolls inside the pill
-  // ----------------------------------------------------------
   Widget _buildRollingContent(double width) {
     final participants = widget.participants;
     final itemHeight = pillHeight + spacing;
@@ -119,14 +138,12 @@ class _DrawerSelectionRollerState extends State<DrawerSelectionRoller> {
           width,
         );
       },
-      itemCount: participants.length * 50, // long loop for rolling
+      itemCount: participants.length * 50,
     );
   }
 
-  // ----------------------------------------------------------
-  // 🔥 Rolling avatar + name widget (NOT the outer pill)
-  // ----------------------------------------------------------
-  Widget _buildInnerContent(String name, String? avatarUrl, double width) {
+  Widget _buildInnerContent(
+      String name, String? avatarUrl, double width) {
     final String initial =
         name.isNotEmpty ? name.characters.first.toUpperCase() : '?';
 
@@ -135,13 +152,10 @@ class _DrawerSelectionRollerState extends State<DrawerSelectionRoller> {
       height: pillHeight,
       padding: EdgeInsets.symmetric(horizontal: 10.w),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Avatar
           Container(
-            width: 32.w,
-            height: 32.h,
+            width: avatarSize,
+            height: avatarSize,
             decoration: const BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.black26,
@@ -151,7 +165,8 @@ class _DrawerSelectionRollerState extends State<DrawerSelectionRoller> {
                   ? Image.asset(
                       avatarUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _fallback(initial),
+                      errorBuilder: (_, __, ___) =>
+                          _fallback(initial),
                     )
                   : _fallback(initial),
             ),
@@ -159,7 +174,6 @@ class _DrawerSelectionRollerState extends State<DrawerSelectionRoller> {
 
           SizedBox(width: 10.w),
 
-          // Name
           Expanded(
             child: Transform.translate(
               offset: Offset(0, -2.h),
@@ -167,10 +181,11 @@ class _DrawerSelectionRollerState extends State<DrawerSelectionRoller> {
                 name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.left,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 12.sp,
+                  fontSize: MediaQuery.of(context).size.width > 600
+                      ? 14.sp
+                      : 12.sp,
                   fontWeight: FontWeight.bold,
                 ),
               ),

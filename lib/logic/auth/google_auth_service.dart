@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:dartz/dartz.dart';
+import 'package:inkbattle_frontend/config/environment.dart';
 import 'package:inkbattle_frontend/repositories/user_repository.dart';
 import 'package:inkbattle_frontend/models/user_model.dart';
 import 'package:inkbattle_frontend/utils/api/failure.dart';
@@ -8,6 +9,9 @@ import 'package:inkbattle_frontend/constants/app_images.dart';
 
 class GoogleAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  // final GoogleSignIn _googleSignIn = GoogleSignIn(
+  //   serverClientId: Environment.googleWebClientId,
+  // );
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final UserRepository _userRepository = UserRepository();
 

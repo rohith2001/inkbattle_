@@ -14,7 +14,7 @@ class CustomRoomButton extends StatelessWidget {
   Widget build(BuildContext context) {
     bool isTablet = MediaQuery.of(context).size.width > 600;
     double buttonWidth = isTablet ? 0.45.sw : 0.6.sw;
-    double buttonHeight = 0.08.sh;
+    double buttonHeight = isTablet ? 70.h : 0.08.sh;
 
     return SizedBox(
       width: buttonWidth,

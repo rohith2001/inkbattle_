@@ -24,31 +24,34 @@ class RoundAnnouncementManager {
   });
 
   void startAnnouncementSequence({bool? isTimeUp}) {
-    // Ensure no existing sequence is running
-    print(overlay1);
     clearSequence();
+    final isTimeUpVal = isTimeUp == true;
 
     final overlay = Overlay.of(context);
-    print(isTimeUp);
-    if (isTimeUp!) {
+    if (isTimeUpVal && overlay1 != null) {
       overlay.insert(overlay1!);
       _activeOverlays.add(overlay1!);
     }
 
-    // Message 2: After 1.5 seconds
+    // Safety: clear any stuck overlays after 8s so compliment never blocks (phase_change to interval will still come from server)
+    Timer(Duration(milliseconds: 8000), () {
+      if (_activeOverlays.isNotEmpty && context.mounted) {
+        clearSequence();
+      }
+    });
+
     _sequenceTimer = Timer(const Duration(milliseconds: 2500), () {
       if (!context.mounted) {
         clearSequence();
         return;
       }
-      if (isTimeUp) {
-        _removeOverlay(overlay1);
+      if (isTimeUpVal) _removeOverlay(overlay1);
+
+      if (overlay2 != null) {
+        overlay.insert(overlay2!);
+        _activeOverlays.add(overlay2!);
       }
 
-      overlay.insert(overlay2!);
-      _activeOverlays.add(overlay2!);
-
-      // Message 3: After another 1.5 seconds
       _sequenceTimer = Timer(const Duration(milliseconds: 2500), () {
         if (!context.mounted) {
           clearSequence();
@@ -56,14 +59,15 @@ class RoundAnnouncementManager {
         }
         _removeOverlay(overlay2);
 
-        overlay.insert(overlay3!);
-        _activeOverlays.add(overlay3!);
+        if (overlay3 != null) {
+          overlay.insert(overlay3!);
+          _activeOverlays.add(overlay3!);
+        }
 
-        // Final Cleanup: After 1.0 second, remove the final message and trigger phase change
         _sequenceTimer = Timer(const Duration(milliseconds: 2000), () {
           _removeOverlay(overlay3);
-          onAllComplete(); // Callback to trigger phase change/word selection
-          clearSequence(); // Final cleanup of timer
+          onAllComplete();
+          clearSequence();
         });
       });
     });

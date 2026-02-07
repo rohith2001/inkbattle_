@@ -15,135 +15,173 @@ class ErrorPopup extends StatelessWidget {
     required this.roomId,
     this.currentDrawerId,
   });
+
   List<RoomParticipant> participants;
   final int roomId;
-  /// Current drawer's user id; required for "Report Drawing" to target the drawer.
   final int? currentDrawerId;
 
   @override
   Widget build(BuildContext context) {
-    final String _logTag = 'ReportPopupScreen';
-    final bool isTablet = MediaQuery.of(context).size.width > 600;
-    return AlertDialog(
-      backgroundColor: const Color(0xFF000000),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12.r),
-        side: const BorderSide(
-            color: Color.fromARGB(255, 248, 227, 108), width: 2),
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              IconButton(
-                icon: Icon(
-                  Icons.close,
-                  color: Colors.white,
-                  size: isTablet ? 28.r : 24.r,
-                ),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-          SizedBox(height: 5.h),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Image.asset(
-                AppImages.reportlogo,
-                width: 40.w,
-                height: 40.w,
-              ),
-            ],
-          ),
-          SizedBox(height: 25.h),
-          Text(
-            'Report an Issue',
-            style: GoogleFonts.lato(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-              fontSize: 22.sp,
+    final String logTag = 'ReportPopupScreen';
+    final mq = MediaQuery.of(context).size;
+    final bool isTablet = mq.width > 600;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.symmetric(horizontal: 16.w),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: isTablet ? 420.w : mq.width * 0.92,
+        ),
+        child: Container(
+          padding: EdgeInsets.all(16.w),
+          decoration: BoxDecoration(
+            color: const Color(0xFF000000),
+            borderRadius: BorderRadius.circular(12.r),
+            border: Border.all(
+              color: const Color.fromARGB(255, 248, 227, 108),
+              width: 2,
             ),
           ),
-          SizedBox(height: 8.h),
-          Text(
-            'Help us keep the game fun and safe',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.lato(
-                color: const Color(0xFF979595),
-                fontSize: 13.sp,
-                fontWeight: FontWeight.w400),
-          ),
-          SizedBox(height: 20.h),
-          Column(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _buildOptionButton(
-                context,
-                title: 'Report Member',
-                subtitle: 'Report inappropriate chat, name, or behavior',
-                imagePath: AppImages.reportmember,
-                onPressed: () {
-                  developer.log('Report Member button pressed', name: _logTag);
-                  Navigator.pop(context);
-                  showDialog(
-                    context: context,
-                    builder: (context) => FormPopup(
-                      roomId: roomId,
-                      participants: participants,
+              /// CLOSE BUTTON
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: isTablet ? 28.r : 24.r,
                     ),
-                  );
-                },
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
               ),
+
+              SizedBox(height: 5.h),
+
+              /// ICON
+              Image.asset(
+                AppImages.reportlogo,
+                width: isTablet ? 45.w : 40.w,
+                height: isTablet ? 45.w : 40.w,
+              ),
+
+              SizedBox(height: 25.h),
+
+              /// TITLE
+              Text(
+                'Report an Issue',
+                style: GoogleFonts.lato(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 22.sp,
+                ),
+              ),
+
+              SizedBox(height: 8.h),
+
+              Text(
+                'Help us keep the game fun and safe',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.lato(
+                  color: const Color(0xFF979595),
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+
               SizedBox(height: 20.h),
-              _buildOptionButton(
-                context,
-                title: 'Report Drawing',
-                subtitle:
-                    'Report if someone draws answers or offensive content',
-                imagePath: AppImages.reportdrawing,
-                onPressed: () async {
-                  developer.log('Report Drawing button pressed', name: _logTag);
-                  if (currentDrawerId == null) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'You can report the drawer only during drawing or reveal phase.',
-                          ),
-                        ),
+
+              /// OPTIONS
+              Column(
+                children: [
+                  _buildOptionButton(
+                    context,
+                    title: 'Report Member',
+                    subtitle:
+                        'Report inappropriate chat, name, or behavior',
+                    imagePath: AppImages.reportmember,
+                    onPressed: () {
+                      developer.log(
+                        'Report Member button pressed',
+                        name: logTag,
                       );
-                    }
-                    return;
-                  }
-                  Navigator.pop(context);
-                  final repo = UserRepository();
-                  final result = await repo.reportUser(
-                    roomId: roomId.toString(),
-                    userToBlockId: currentDrawerId!,
-                    reportType: 'drawing',
-                  );
-                  if (!context.mounted) return;
-                  result.fold(
-                    (failure) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(failure.message)),
-                      );
-                    },
-                    (_) {
+
+                      Navigator.pop(context);
+
                       showDialog(
                         context: context,
-                        builder: (context) => const SubmittedPopup(),
+                        builder: (context) => FormPopup(
+                          roomId: roomId,
+                          participants: participants,
+                        ),
                       );
                     },
-                  );
-                },
+                  ),
+
+                  SizedBox(height: 20.h),
+
+                  _buildOptionButton(
+                    context,
+                    title: 'Report Drawing',
+                    subtitle:
+                        'Report if someone draws answers or offensive content',
+                    imagePath: AppImages.reportdrawing,
+                    onPressed: () async {
+                      developer.log(
+                        'Report Drawing button pressed',
+                        name: logTag,
+                      );
+
+                      if (currentDrawerId == null) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'You can report the drawer only during drawing or reveal phase.',
+                              ),
+                            ),
+                          );
+                        }
+                        return;
+                      }
+
+                      Navigator.pop(context);
+
+                      final repo = UserRepository();
+                      final result = await repo.reportUser(
+                        roomId: roomId.toString(),
+                        userToBlockId: currentDrawerId!,
+                        reportType: 'drawing',
+                      );
+
+                      if (!context.mounted) return;
+
+                      result.fold(
+                        (failure) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(failure.message)),
+                          );
+                        },
+                        (_) {
+                          showDialog(
+                            context: context,
+                            builder: (context) =>
+                                const SubmittedPopup(),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -161,13 +199,15 @@ class ErrorPopup extends StatelessWidget {
       style: ElevatedButton.styleFrom(
         backgroundColor: const Color(0xFF0A0A0A),
         foregroundColor: Colors.white,
-        minimumSize: Size(double.infinity, isTablet ? 60.h : 50.h),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+        minimumSize:
+            Size(double.infinity, isTablet ? 60.h : 50.h),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8.r),
+        ),
         elevation: 2,
       ),
       onPressed: onPressed,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Image.asset(
             imagePath,
@@ -192,9 +232,10 @@ class ErrorPopup extends StatelessWidget {
                 Text(
                   subtitle,
                   style: GoogleFonts.lato(
-                      color: const Color(0xFF979595),
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.w400),
+                    color: const Color(0xFF979595),
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w400,
+                  ),
                 ),
               ],
             ),

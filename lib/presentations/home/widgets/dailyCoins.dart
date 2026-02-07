@@ -131,10 +131,12 @@ class _DailyCoinsPopupState extends State<DailyCoinsPopup> {
     final h = MediaQuery.of(context).size.height;
     final w = MediaQuery.of(context).size.width;
     final isTablet = w > 600;
-
-    if (isTablet) return h * 0.30;      // tablets
-    if (h < 700) return h * 0.32;       // small phones
-    return h * 0.35;                    // normal phones
+    double base;
+    if (isTablet) base = h * 0.30;
+    else if (h < 700) base = h * 0.32;
+    else base = h * 0.35;
+    final size = base * 3; // 3x size for visibility
+    return size.clamp(0, h * 0.7); // cap at 70% of screen
   }
 
   double _dialogWidth(BuildContext context) {
@@ -179,7 +181,7 @@ class _DailyCoinsPopupState extends State<DailyCoinsPopup> {
                   source:
                       'https://lottie.host/5b680b27-3ad1-4101-a9a9-0a85fac47ede/XJlDHgYasP.lottie',
                   autoplay: true,
-                  loop: false,
+                  loop: true,
                 ),
               ),
 

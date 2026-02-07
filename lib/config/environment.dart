@@ -45,4 +45,9 @@ class Environment {
   //     int.tryParse(dotenv.env['COINS_ON_PAYMENT'] ?? '8000') ?? 8000;
   static String get agoraAppId =>
       dotenv.env['AGORA_APP_ID'] ?? '85ed3bccf4dc4f62b3e30b834a0b5670';
+
+  // /// Web client ID (OAuth 2.0) from Firebase/Google Cloud. Required for Google Sign-In idToken on Android.
+  // static String get googleWebClientId =>
+  //     dotenv.env['GOOGLE_WEB_CLIENT_ID'] ??
+  //     '810403540241-ip9gtcb25f8m6f3du23riuqj5h5dbr9l.apps.googleusercontent.com';
 }

@@ -595,7 +595,7 @@ class _AdsFreePopupState extends State<AdsFreePopup> {
     final bool isTablet = mq.width > 600;
 
     final double dialogWidth = isTablet ? mq.width * 0.80 : mq.width * 0.85;
-    final double dialogHeight = isTablet ? mq.height * 0.55 : mq.height * 0.6;
+    final double dialogHeight = isTablet ? mq.height * 0.50 : mq.height * 0.6;
     final double coinSize = dialogWidth * 0.30;
     final double closeSize = 30.w;
 

@@ -30,147 +30,173 @@ class TeamDisplayPopup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    ScreenUtil.init(context, designSize: const Size(360, 800));
+    final mq = MediaQuery.of(context).size;
+    final bool isTablet = mq.width > 600;
 
     return Center(
-      child: Container(
-        width: 0.9.sw,
-        height: 0.80.sh,
-        decoration: BoxDecoration(
-          color: const Color(0xFF131424),
-          borderRadius: BorderRadius.circular(18.r),
-          border: Border.all(
-            color: Colors.blueAccent.withOpacity(0.6),
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.blueAccent.withOpacity(0.4),
-              blurRadius: 8,
-              spreadRadius: 1,
-            ),
-          ],
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: isTablet ? 480.w : mq.width * 0.9,
+          maxHeight: mq.height * 0.80,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            children: [
-              Container(
-                width: double.infinity,
-                height: 100.h,
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    // Blue = Team A, Orange = Team B (match game_room_screen mapping)
-                    image: AssetImage((teamName == "Team A" || teamName == "A")
-                        ? AppImages.redflg_teamA
-                        : AppImages.redflg_teamB),
-                    fit: BoxFit.cover,
-                  ),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(18),
-                    topRight: Radius.circular(18),
-                  ),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  teamName,
-                  style: GoogleFonts.lato(
-                    color: Colors.white,
-                    fontSize: 20.sp,
-                    fontWeight: FontWeight.w700,
-                    shadows: [
-                      Shadow(
-                        color: Colors.black.withOpacity(0.8),
-                        blurRadius: 4,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                ),
+        child: Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF131424),
+            borderRadius: BorderRadius.circular(18.r),
+            border: Border.all(
+              color: Colors.blueAccent.withOpacity(0.6),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.blueAccent.withOpacity(0.4),
+                blurRadius: 8,
+                spreadRadius: 1,
               ),
-              Expanded(
-                child: Padding(
-                  padding:
-                      EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                  child: ListView.builder(
-                    itemCount: players.length,
-                    itemBuilder: (context, index) {
-                      final player = players[index];
-                      return Container(
-                        decoration: BoxDecoration(
-                            border: BoxBorder.fromLTRB(
-                                bottom: const BorderSide(
-                                    color: Color.fromRGBO(36, 38, 63, 1)))),
-                        margin: EdgeInsets.only(bottom: 10.h),
-                        padding: EdgeInsets.symmetric(
-                            horizontal: 12.w, vertical: 10.h),
-                        child: Row(
-                          children: [
-                            Container(
-                              height: 30.h,
-                              width: 30.w,
-                              padding: EdgeInsets.all(8.h),
-                              decoration: BoxDecoration(
+            ],
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(10.w),
+            child: Column(
+              children: [
+
+                /// HEADER
+                Container(
+                  width: double.infinity,
+                  height: isTablet ? 110.h : 100.h,
+                  decoration: BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage(
+                        (teamName == "Team A" || teamName == "A")
+                            ? AppImages.redflg_teamA
+                            : AppImages.redflg_teamB,
+                      ),
+                      fit: BoxFit.cover,
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(18),
+                      topRight: Radius.circular(18),
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    teamName,
+                    style: GoogleFonts.lato(
+                      color: Colors.white,
+                      fontSize: isTablet ? 22.sp : 20.sp,
+                      fontWeight: FontWeight.w700,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black.withOpacity(0.8),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                /// PLAYER LIST
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 12.w, vertical: 8.h),
+                    child: ListView.builder(
+                      itemCount: players.length,
+                      itemBuilder: (context, index) {
+                        final player = players[index];
+
+                        return Container(
+                          margin: EdgeInsets.only(bottom: 10.h),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 12.w, vertical: 10.h),
+                          decoration: const BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: Color.fromRGBO(36, 38, 63, 1),
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+
+                              /// RANK
+                              Container(
+                                height: isTablet ? 36.h : 30.h,
+                                width: isTablet ? 36.w : 30.w,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
                                   color: const Color(0xFF1B1D33),
-                                  borderRadius: BorderRadius.circular(7)),
-                              child: Center(
+                                  borderRadius: BorderRadius.circular(7),
+                                ),
                                 child: Text(
                                   '${player.rank}',
                                   style: TextStyle(
                                     color: Colors.white,
-                                    fontSize: 16.sp,
+                                    fontSize:
+                                        isTablet ? 18.sp : 16.sp,
                                     fontWeight: FontWeight.w600,
-                                    decoration: TextDecoration.none,
                                   ),
                                 ),
                               ),
-                            ),
-                            SizedBox(
-                              width: 20.w,
-                            ),
-                            Container(
-                              width: 32.w,
-                              height: 32.w,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                image: DecorationImage(
-                                  image: AssetImage(player.avatarPath),
-                                  fit: BoxFit.cover,
+
+                              SizedBox(width: 15.w),
+
+                              /// AVATAR
+                              Container(
+                                width: isTablet ? 40.w : 32.w,
+                                height: isTablet ? 40.w : 32.w,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  image: DecorationImage(
+                                    image:
+                                        AssetImage(player.avatarPath),
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
                               ),
-                            ),
-                            // SizedBox(width: 50.w),
-                            Row(
-                              children: [
-                                Text(
-                                  player.name,
-                                  style: GoogleFonts.lato(
-                                    color: Colors.white,
-                                    fontSize: 17.sp,
-                                    fontWeight: FontWeight.w500,
-                                    decoration: TextDecoration.none,
-                                  ),
+
+                              SizedBox(width: 12.w),
+
+                              /// NAME + FLAG
+                              Expanded(
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        player.name,
+                                        overflow:
+                                            TextOverflow.ellipsis,
+                                        style: GoogleFonts.lato(
+                                          color: Colors.white,
+                                          fontSize: isTablet
+                                              ? 18.sp
+                                              : 17.sp,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: 10.w),
+                                    Text(
+                                      player.flagEmoji,
+                                      style: TextStyle(
+                                        fontSize: isTablet
+                                            ? 20.sp
+                                            : 18.sp,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                SizedBox(
-                                  width: 15.w,
-                                ),
-                                Text(
-                                  player.flagEmoji,
-                                  style: TextStyle(
-                                    fontSize: 18.sp,
-                                    decoration: TextDecoration.none,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    },
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -189,8 +215,7 @@ class RibbonTextPainter extends CustomPainter {
     final textPainter = TextPainter(
       text: TextSpan(text: text, style: textStyle),
       textDirection: TextDirection.ltr,
-    );
-    textPainter.layout();
+    )..layout();
 
     final centerX = size.width / 2;
     final centerY = size.height / 2.3;
@@ -200,27 +225,34 @@ class RibbonTextPainter extends CustomPainter {
     final charWidth = textPainter.width / charCount;
 
     for (int i = 0; i < charCount; i++) {
-      final x =
-          centerX - (textPainter.width / 2) + (i * charWidth) + (charWidth / 2);
+      final x = centerX -
+          (textPainter.width / 2) +
+          (i * charWidth) +
+          (charWidth / 2);
+
       final y = centerY -
           curveHeight +
-          (curveHeight * math.pow((i - charCount / 2) / (charCount / 2), 2));
+          (curveHeight *
+              math.pow(
+                  (i - charCount / 2) / (charCount / 2), 2));
 
       final charPainter = TextPainter(
         text: TextSpan(text: text[i], style: textStyle),
         textDirection: TextDirection.ltr,
-      );
-      charPainter.layout();
+      )..layout();
 
       canvas.save();
       canvas.translate(x, y);
-      canvas.rotate(0);
       charPainter.paint(
-          canvas, Offset(-charPainter.width / 2, -charPainter.height / 2));
+        canvas,
+        Offset(-charPainter.width / 2,
+            -charPainter.height / 2),
+      );
       canvas.restore();
     }
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) =>
+      true;
 }

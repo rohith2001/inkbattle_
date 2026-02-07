@@ -3,7 +3,6 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-  agora_rtc_engine
   audioplayers_windows
   file_saver
   file_selector_windows
@@ -12,7 +11,6 @@ list(APPEND FLUTTER_PLUGIN_LIST
   flutter_inappwebview_windows
   flutter_secure_storage_windows
   flutter_webrtc
-  iris_method_channel
   permission_handler_windows
   url_launcher_windows
 )
