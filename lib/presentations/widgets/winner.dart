@@ -61,7 +61,9 @@ class _TeamWinnerPopupState extends State<TeamWinnerPopup> {
       await _soundPlayer.setVolume(volume.clamp(0.0, 1.0));
       await _soundPlayer.play(
         AssetSource(
-          widget.isWinner ? 'sounds/winner-sound.mp3' : 'sounds/lose-sound.mp3',
+          widget.isWinner
+              ? 'sounds/winner-sound.mp3'
+              : 'sounds/lose-sound.mp3',
         ),
       );
     } catch (_) {}
@@ -70,9 +72,15 @@ class _TeamWinnerPopupState extends State<TeamWinnerPopup> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
 
-    // Sort teams by score
+    // Better tablet detection
+    final isTablet = size.shortestSide >= 600;
+
+    // Increased slightly to prevent ribbon clipping
+    final modalHeightFactor = isTablet ? 0.72 : 0.85;
+    final maxWidth = isTablet ? 700.0 : double.infinity;
+
+    // Sort teams
     final sortedTeams = List<Team>.from(widget.teams)
       ..sort((a, b) => b.score.compareTo(a.score));
 
@@ -82,25 +90,21 @@ class _TeamWinnerPopupState extends State<TeamWinnerPopup> {
 
     final isTwoPlayers = sortedTeams.length == 2;
 
-    final modalHeightFactor = isTablet ? 0.65 : 0.85;
-    final maxWidth = isTablet ? 600.0 : double.infinity;
-
-    // Dynamic heights based on screen size
     final basePodiumHeight = size.height * (isTablet ? 0.18 : 0.20);
     final rank1Height = basePodiumHeight;
-    final rank2Height = basePodiumHeight * 0.75; // More distinct difference
+    final rank2Height = basePodiumHeight * 0.75;
     final rank3Height = basePodiumHeight * 0.55;
 
-    // Dynamic widths to prevent overflow on small screens
-    // We reserve some padding, then split remaining space
     final availableWidth = isTablet ? 550.0 : size.width * 0.9;
-    final podiumWidth = availableWidth / 3.2; 
+    final podiumWidth = availableWidth / 3.2;
 
     return WillPopScope(
       onWillPop: () async => false,
       child: Stack(
         children: [
           Container(color: Colors.black.withOpacity(0.6)),
+
+          /// ---------------- POPUP ----------------
           Center(
             child: ConstrainedBox(
               constraints: BoxConstraints(maxWidth: maxWidth),
@@ -115,10 +119,8 @@ class _TeamWinnerPopupState extends State<TeamWinnerPopup> {
                       end: Alignment.bottomCenter,
                     ),
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: Colors.blueAccent,
-                      width: 1.5,
-                    ),
+                    border:
+                        Border.all(color: Colors.blueAccent, width: 1.5),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.blueAccent.withOpacity(0.3),
@@ -132,27 +134,31 @@ class _TeamWinnerPopupState extends State<TeamWinnerPopup> {
                         horizontal: isTablet ? 16 : 8, vertical: 16),
                     child: Column(
                       children: [
-                        // ---------- RIBBON ----------
-                        Container(
+                        /// ---------- RIBBON (FIXED HEIGHT) ----------
+                        SizedBox(
                           height: isTablet ? 90 : 70,
                           width: double.infinity,
-                          decoration: const BoxDecoration(
-                            image: DecorationImage(
-                              image: AssetImage(AppImages.redflg),
-                              fit: BoxFit.cover,
-                            ),
-                            borderRadius: BorderRadius.only(
-                              topLeft: Radius.circular(18),
-                              topRight: Radius.circular(18),
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              image: DecorationImage(
+                                image: AssetImage(AppImages.redflg),
+                                fit: BoxFit.cover,
+                              ),
+                              borderRadius: BorderRadius.only(
+                                topLeft: Radius.circular(18),
+                                topRight: Radius.circular(18),
+                              ),
                             ),
                           ),
                         ),
 
-                        // Use Spacer to push podiums to the visually correct spot
-                        const Spacer(), 
+                        /// replaces Spacer()
+                        const Flexible(
+                          fit: FlexFit.loose,
+                          child: SizedBox(),
+                        ),
 
-                        // ---------- PODIUM ROW ----------
-                        // CrossAxisAlignment.end ensures they all start from the same Y-axis bottom
+                        /// ---------- PODIUM ----------
                         SizedBox(
                           width: double.infinity,
                           child: Row(
@@ -177,9 +183,13 @@ class _TeamWinnerPopupState extends State<TeamWinnerPopup> {
                           ),
                         ),
 
-                        const Spacer(),
+                        /// replaces Spacer()
+                        const Flexible(
+                          fit: FlexFit.loose,
+                          child: SizedBox(),
+                        ),
 
-                        // ---------- NEXT BUTTON ----------
+                        /// ---------- NEXT BUTTON ----------
                         GestureDetector(
                           onTap: () {
                             widget.onNext?.call();
@@ -216,6 +226,11 @@ class _TeamWinnerPopupState extends State<TeamWinnerPopup> {
               ),
             ),
           ),
+
+          /// ---------- LOTTIE OVERLAY ----------
+          /// unchanged
+          /// visible
+          /// does NOT block touches
           if (widget.isWinner)
             Positioned.fill(
               child: IgnorePointer(
@@ -232,7 +247,7 @@ class _TeamWinnerPopupState extends State<TeamWinnerPopup> {
     );
   }
 
-  // ---------- HELPER: SINGLE PODIUM COLUMN ----------
+  // ---------- PODIUM COLUMN ----------
   Widget _buildPodiumColumn(
     Team? team,
     int rank,
@@ -240,7 +255,6 @@ class _TeamWinnerPopupState extends State<TeamWinnerPopup> {
     double width,
     bool isTablet,
   ) {
-    // If we have a slot but no player (rare edge case), return empty space
     if (team == null) return SizedBox(width: width);
 
     final asset = rank == 1
@@ -252,10 +266,9 @@ class _TeamWinnerPopupState extends State<TeamWinnerPopup> {
     return SizedBox(
       width: width,
       child: Column(
-        mainAxisSize: MainAxisSize.min, // Shrink wrap vertically
+        mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          // 1. AVATAR
           CircleAvatar(
             radius: isTablet ? (rank == 1 ? 35 : 28) : (rank == 1 ? 28 : 22),
             backgroundImage: AssetImage(team.avatar),
@@ -263,7 +276,6 @@ class _TeamWinnerPopupState extends State<TeamWinnerPopup> {
           ),
           const SizedBox(height: 6),
 
-          // 2. NAME + STAR (Current User)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
@@ -282,16 +294,13 @@ class _TeamWinnerPopupState extends State<TeamWinnerPopup> {
               ),
               if (team.isCurrentUser) ...[
                 const SizedBox(width: 4),
-                Icon(
-                  Icons.star,
-                  color: Colors.amber,
-                  size: isTablet ? 18 : 14,
-                ),
+                Icon(Icons.star,
+                    color: Colors.amber,
+                    size: isTablet ? 18 : 14),
               ]
             ],
           ),
 
-          // 3. SCORE
           Text(
             "${team.score}",
             style: GoogleFonts.lato(
@@ -302,16 +311,10 @@ class _TeamWinnerPopupState extends State<TeamWinnerPopup> {
           ),
           const SizedBox(height: 4),
 
-          // 4. PODIUM IMAGE (The Step)
-          // This sits at the bottom of the column.
-          // Because the parent Row is CrossAxis.end, these images align.
           SizedBox(
             height: height,
-            width: width, // Fill the calculated width
-            child: Image.asset(
-              asset,
-              fit: BoxFit.fill,
-            ),
+            width: width,
+            child: Image.asset(asset, fit: BoxFit.fill),
           ),
         ],
       ),

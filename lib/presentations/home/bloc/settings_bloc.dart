@@ -1,6 +1,8 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:inkbattle_frontend/utils/preferences/local_preferences.dart';
 import 'package:audioplayers/audioplayers.dart';
+
+// ---------------- EVENTS ----------------
 abstract class SettingsEvent {}
 
 class SettingsInitialEvent extends SettingsEvent {}
@@ -10,6 +12,7 @@ class UpdateSoundValue extends SettingsEvent {
   UpdateSoundValue(this.value);
 }
 
+// ---------------- STATE ----------------
 class SettingsState {
   final double soundValue;
 
@@ -22,24 +25,51 @@ class SettingsState {
   }
 }
 
+// ---------------- BLOC ----------------
 class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
+
+  // Shared player ONLY for preview volume
   final AudioPlayer audioPlayer = AudioPlayer();
-  SettingsBloc() : super(SettingsState(soundValue: 0.4)) {
+
+  SettingsBloc() : super(SettingsState(soundValue: 1.0)) {
     on<SettingsInitialEvent>(_onSettingsInitial);
     on<UpdateSoundValue>(_onUpdateSoundValue);
   }
 
-  void _onSettingsInitial(
-      SettingsInitialEvent event, Emitter<SettingsState> emit) async{
-        final vol = await LocalStorageUtils.getVolume();
-        audioPlayer.setVolume(vol);
-    emit(SettingsState(soundValue: vol));
+  // MUST return Future<void>
+  Future<void> _onSettingsInitial(
+      SettingsInitialEvent event,
+      Emitter<SettingsState> emit,
+      ) async {
+
+    final vol = await LocalStorageUtils.getVolume();
+
+    await audioPlayer.setVolume(vol);
+
+    emit(state.copyWith(soundValue: vol));
   }
 
-  void _onUpdateSoundValue(
-      UpdateSoundValue event, Emitter<SettingsState> emit) {
-    emit(state.copyWith(soundValue: event.value));
-    LocalStorageUtils.setVolume(event.value);
-    audioPlayer.setVolume(event.value);
+  // Proper async handler
+  Future<void> _onUpdateSoundValue(
+      UpdateSoundValue event,
+      Emitter<SettingsState> emit,
+      ) async {
+
+    final newVolume = event.value.clamp(0.0, 1.0);
+
+    // Save locally FIRST
+    await LocalStorageUtils.setVolume(newVolume);
+
+    //  Update preview player
+    await audioPlayer.setVolume(newVolume);
+
+    // Update UI LAST
+    emit(state.copyWith(soundValue: newVolume));
+  }
+
+  @override
+  Future<void> close() {
+    audioPlayer.dispose();
+    return super.close();
   }
 }

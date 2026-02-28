@@ -98,6 +98,17 @@ class RoomModel {
     return null;
   }
 
+  /// Parses roundPhaseEndTime from JSON (Unix ms number, ISO string, or DateTime).
+  static DateTime? _parseRoundPhaseEndTime(dynamic value) {
+    if (value == null) return null;
+    if (value is int || value is num) {
+      return DateTime.fromMillisecondsSinceEpoch((value as num).toInt());
+    }
+    if (value is String) return DateTime.tryParse(value);
+    if (value is DateTime) return value;
+    return null;
+  }
+
   factory RoomModel.fromJson(Map<String, dynamic> json) => RoomModel(
     id: json["id"],
     code: json["code"],
@@ -125,9 +136,7 @@ class RoomModel {
         ? null
         : DateTime.parse(json["roundStartTime"]),
     roundPhase: json["roundPhase"],
-    roundPhaseEndTime: json["roundPhaseEndTime"] == null
-        ? null
-        : DateTime.parse(json["roundPhaseEndTime"]),
+    roundPhaseEndTime: _parseRoundPhaseEndTime(json["roundPhaseEndTime"]),
     roundRemainingTime: json["roundRemainingTime"],
 
     // ------------------------------------
