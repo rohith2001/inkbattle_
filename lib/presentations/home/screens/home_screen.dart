@@ -478,11 +478,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                                     context,
                                                     coinsAwarded: coins,
                                                     onComplete: () {
-                                                      developer.log(
-                                                        'Video animation completed after ad watched',
-                                                        name: _logTag,
-                                                        level: 'debug',
-                                                      );
+                                                      NativeLogService.log(
+                                                          'Video animation completed after ad watched',
+                                                          tag: _logTag,
+                                                          level: 'debug',
+                                                        );
                                                     },
                                                   );
                                                   _loadUserData();
