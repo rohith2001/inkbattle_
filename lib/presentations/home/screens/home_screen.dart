@@ -222,8 +222,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               if (showNotification)
                 Positioned(
                   top: -2,
-                  right: -2,
-                  child: Container(
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
                     width: isTablet ? 14.r : 10.r,
                     height: isTablet ? 14.r : 10.r,
                     decoration: BoxDecoration(
@@ -237,6 +239,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                       ],
                     ),
+                  ),
                   ),
                 ),
             ],
@@ -375,10 +378,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                               ),
                                             ),
                                           ),
-                                        // Daily Coins Button
+                                        // Daily Coins Button - inside container
                                         Positioned(
-                                          left: circleSize * 0.01,
-                                          top: circleSize * 0.01,
+                                          left: circleSize * 0.04,
+                                          top: circleSize * 0.04,
                                           child: _buildCircleButton(
                                             isTablet: isTablet,
                                             size: circleSize,
@@ -396,64 +399,73 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                                 ),
                                               );
                                             },
-                                            child: Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  'GET',
-                                                  style: TextStyle(
-                                                    fontSize: isTablet ? 11.sp : 9.sp,
-                                                    fontWeight: FontWeight.w900,
-                                                    color: Colors.white,
-                                                    shadows: const [
-                                                      Shadow(
-                                                        blurRadius: 2.5,
-                                                        color: Colors.black,
-                                                        offset: Offset(1.5, 1.5),
+                                            child: Padding(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 6.w,
+                                                vertical: 4.h,
+                                              ),
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Column(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      'GET',
+                                                      style: TextStyle(
+                                                        fontSize: isTablet ? 11.sp : 9.sp,
+                                                        fontWeight: FontWeight.w900,
+                                                        color: Colors.white,
+                                                        shadows: const [
+                                                          Shadow(
+                                                            blurRadius: 2.5,
+                                                            color: Colors.black,
+                                                            offset: Offset(1.5, 1.5),
+                                                          ),
+                                                        ],
                                                       ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                Text(
-                                                  'DAILY',
-                                                  style: TextStyle(
-                                                    fontSize: isTablet ? 11.sp : 9.sp,
-                                                    fontWeight: FontWeight.w900,
-                                                    color: Colors.white,
-                                                    shadows: const [
-                                                      Shadow(
-                                                        blurRadius: 2.5,
-                                                        color: Colors.black,
-                                                        offset: Offset(1.5, 1.5),
+                                                    ),
+                                                    Text(
+                                                      'DAILY',
+                                                      style: TextStyle(
+                                                        fontSize: isTablet ? 11.sp : 9.sp,
+                                                        fontWeight: FontWeight.w900,
+                                                        color: Colors.white,
+                                                        shadows: const [
+                                                          Shadow(
+                                                            blurRadius: 2.5,
+                                                            color: Colors.black,
+                                                            offset: Offset(1.5, 1.5),
+                                                          ),
+                                                        ],
                                                       ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                Text(
-                                                  'COINS',
-                                                  style: TextStyle(
-                                                    fontSize: isTablet ? 11.sp : 9.sp,
-                                                    fontWeight: FontWeight.w900,
-                                                    color: Colors.white,
-                                                    shadows: const [
-                                                      Shadow(
-                                                        blurRadius: 2.5,
-                                                        color: Colors.black,
-                                                        offset: Offset(1.5, 1.5),
+                                                    ),
+                                                    Text(
+                                                      'COINS',
+                                                      style: TextStyle(
+                                                        fontSize: isTablet ? 11.sp : 9.sp,
+                                                        fontWeight: FontWeight.w900,
+                                                        color: Colors.white,
+                                                        shadows: const [
+                                                          Shadow(
+                                                            blurRadius: 2.5,
+                                                            color: Colors.black,
+                                                            offset: Offset(1.5, 1.5),
+                                                          ),
+                                                        ],
                                                       ),
-                                                    ],
-                                                  ),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ],
+                                              ),
                                             ),
                                           ),
                                         ),
-                                        // Ads Free Button
+                                        // Ads Free Button - inside container
                                         Positioned(
-                                          right: circleSize * 0.01,
-                                          bottom: circleSize * 0.01,
+                                          right: circleSize * 0.04,
+                                          bottom: circleSize * 0.04,
                                           child: _buildCircleButton(
                                             isTablet: isTablet,
                                             size: circleSize,
@@ -480,43 +492,51 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                                 },
                                               );
                                             },
-                                            child: Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Text(
-                                                  'ADS',
-                                                  style: TextStyle(
-                                                    fontSize: isTablet ? 15.sp : 12.sp,
-                                                    fontWeight: FontWeight.w900,
-                                                    color: Colors.white,
-                                                    shadows: const [
-                                                      Shadow(
-                                                        blurRadius: 2.5,
-                                                        color: Colors.black,
-                                                        offset: Offset(1.5, 1.5),
+                                            child: Padding(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 6.w,
+                                                vertical: 4.h,
+                                              ),
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                child: Column(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    Text(
+                                                      'ADS',
+                                                      style: TextStyle(
+                                                        fontSize: isTablet ? 15.sp : 12.sp,
+                                                        fontWeight: FontWeight.w900,
+                                                        color: Colors.white,
+                                                        shadows: const [
+                                                          Shadow(
+                                                            blurRadius: 2.5,
+                                                            color: Colors.black,
+                                                            offset: Offset(1.5, 1.5),
+                                                          ),
+                                                        ],
                                                       ),
-                                                    ],
-                                                  ),
->>>>>>> a905a4d (Changes P-2)
-                                                ),
-                                                Text(
-                                                  'FREE',
-                                                  style: TextStyle(
-                                                    fontSize: isTablet ? 15.sp : 12.sp,
-                                                    fontWeight: FontWeight.w900,
-                                                    color: Colors.white,
-                                                    shadows: const [
-                                                      Shadow(
-                                                        blurRadius: 2.5,
-                                                        color: Colors.black,
-                                                        offset: Offset(1.5, 1.5),
+                                                    ),
+                                                    Text(
+                                                      'FREE',
+                                                      style: TextStyle(
+                                                        fontSize: isTablet ? 15.sp : 12.sp,
+                                                        fontWeight: FontWeight.w900,
+                                                        color: Colors.white,
+                                                        shadows: const [
+                                                          Shadow(
+                                                            blurRadius: 2.5,
+                                                            color: Colors.black,
+                                                            offset: Offset(1.5, 1.5),
+                                                          ),
+                                                        ],
                                                       ),
-                                                    ],
-                                                  ),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ],
+                                              ),
                                             ),
                                           ),
                                         ),

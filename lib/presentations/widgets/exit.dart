@@ -4,13 +4,13 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:inkbattle_frontend/constants/app_images.dart';
 
 class ExitPopUp extends StatelessWidget {
-  final String imagePath;
+  final String? imagePath;
   final VoidCallback? onExit;
   final VoidCallback? continueWaiting;
   final String? text;
 
   const ExitPopUp({
-    required this.imagePath,
+    this.imagePath,
     this.onExit,
     this.continueWaiting,
     this.text,
@@ -58,16 +58,16 @@ class ExitPopUp extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              /// OPTIONAL IMAGE (e.g., red X)
-              SizedBox(
-                height: isTablet ? 80.h : 90.h,
-                child: Image.asset(
-                  imagePath,
-                  fit: BoxFit.contain,
+              if (imagePath != null) ...[
+                SizedBox(
+                  height: isTablet ? 80.h : 90.h,
+                  child: Image.asset(
+                    imagePath!,
+                    fit: BoxFit.contain,
+                  ),
                 ),
-              ),
-
-              SizedBox(height: 16.h),
+                SizedBox(height: 16.h),
+              ],
 
               /// HEADER
               Text(
@@ -76,6 +76,7 @@ class ExitPopUp extends StatelessWidget {
                 style: GoogleFonts.luckiestGuy(
                   color: Colors.amber,
                   fontSize: isTablet ? 22.sp : 18.sp,
+                  decoration: TextDecoration.none,
                 ),
               ),
 

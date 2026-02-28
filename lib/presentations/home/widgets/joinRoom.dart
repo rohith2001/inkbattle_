@@ -233,109 +233,131 @@ class _JoinRoomPopupState extends State<JoinRoomPopup> {
 
   @override
   Widget build(BuildContext context) {
-    final mq = MediaQuery.of(context).size;
-    final bool isTablet = mq.width > 600;
-    final double dialogWidth = isTablet ? mq.width * 0.70 : mq.width * 0.85;
-    final double dialogHeight = isTablet ? mq.height * 0.60 : mq.height * 0.45;
+    final mediaQuery = MediaQuery.of(context);
+    final size = mediaQuery.size;
+    final viewInsets = mediaQuery.viewInsets;
+    final safePadding = mediaQuery.padding;
+
+    final bool isTablet = size.width > 600;
+    final double dialogWidth = isTablet ? size.width * 0.70 : size.width * 0.85;
+
+    // Keep the popup visible when the keyboard opens by:
+    // - animating it upward using viewInsets.bottom
+    // - shrinking its height to fit in the remaining space
+    final double availableHeight =
+        size.height - viewInsets.bottom - safePadding.top - safePadding.bottom;
+    final double maxDialogHeight = (availableHeight > 0 ? availableHeight : 0) * 0.90;
+    final double preferredDialogHeight =
+        isTablet ? size.height * 0.60 : size.height * 0.45;
+    final double dialogHeight = preferredDialogHeight.clamp(0.0, maxDialogHeight);
     final double closeSize = 35.w;
 
-    return Center(
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          width: dialogWidth,
-          height: dialogHeight,
-          decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 6, 9, 14),
-            borderRadius: BorderRadius.circular(25.r),
-            border: Border.all(color: Colors.white, width: 3.0),
-          ),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Padding(
-                padding: EdgeInsets.fromLTRB(20.w, 40.h, 20.w, 20.h),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: isTablet ? 0.5.sw : 0.6.sw,
-                      height: isTablet ? 60.h : 50.h,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          Image.asset(
-                            AppImages.roombackbutton,
-                            fit: BoxFit.contain,
-                          ),
-                          Center(
-                              child: Padding(
-                            padding: EdgeInsets.only(top: 10.h),
-                            child: Stack(
-                              children: [
-                                Text(
-                                  'ROOM CARD NO.',
-                                  style: GoogleFonts.luckiestGuy(
-                                    fontSize: 20.sp,
-                                    fontWeight: FontWeight.w400,
-                                    foreground: Paint()
-                                      ..style = PaintingStyle.stroke
-                                      ..strokeWidth = 2
-                                      ..color = Colors.black,
-                                  ),
-                                ),
-                                Text(
-                                  'ROOM CARD NO.',
-                                  style: GoogleFonts.luckiestGuy(
-                                    fontSize: 20.sp,
-                                    fontWeight: FontWeight.w400,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: isTablet ? 30.h : 20.h),
-                    Row(
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: viewInsets.bottom),
+      child: Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            width: dialogWidth,
+            height: dialogHeight,
+            decoration: BoxDecoration(
+              color: const Color.fromARGB(255, 6, 9, 14),
+              borderRadius: BorderRadius.circular(25.r),
+              border: Border.all(color: Colors.white, width: 3.0),
+            ),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(20.w, 40.h, 20.w, 20.h),
+                  child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(
-                        _digitControllers.length,
-                        (index) => _buildDigitBox(
-                          _digitControllers[index],
-                          _focusNodes[index],
-                          // Use a function to determine offset based on index
-                          _getOffsetForIndex(index, isTablet),
-                          isTablet ? 30.w : 35.w,
-                          45.h,
-                          index, // Pass the index now
+                      children: [
+                        SizedBox(
+                          width: isTablet ? 0.5.sw : 0.6.sw,
+                          height: isTablet ? 60.h : 50.h,
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.asset(
+                                AppImages.roombackbutton,
+                                fit: BoxFit.contain,
+                              ),
+                              Center(
+                                  child: Padding(
+                                padding: EdgeInsets.only(top: 10.h),
+                                child: Stack(
+                                  children: [
+                                    Text(
+                                      'ROOM CARD NO.',
+                                      style: GoogleFonts.luckiestGuy(
+                                        fontSize: 20.sp,
+                                        fontWeight: FontWeight.w400,
+                                        foreground: Paint()
+                                          ..style = PaintingStyle.stroke
+                                          ..strokeWidth = 2
+                                          ..color = Colors.black,
+                                      ),
+                                    ),
+                                    Text(
+                                      'ROOM CARD NO.',
+                                      style: GoogleFonts.luckiestGuy(
+                                        fontSize: 20.sp,
+                                        fontWeight: FontWeight.w400,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )),
+                            ],
+                          ),
                         ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Positioned(
-                top: -closeSize * 0.5,
-                left: -closeSize * 0.25,
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: SizedBox(
-                    width: closeSize,
-                    height: closeSize,
-                    child: Image.asset(
-                      AppImages.roomback,
-                      width: closeSize,
-                      height: closeSize,
-                      fit: BoxFit.contain,
+                        SizedBox(height: isTablet ? 30.h : 20.h),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(
+                            _digitControllers.length,
+                            (index) => _buildDigitBox(
+                              _digitControllers[index],
+                              _focusNodes[index],
+                              // Use a function to determine offset based on index
+                              _getOffsetForIndex(index, isTablet),
+                              isTablet ? 30.w : 35.w,
+                              45.h,
+                              index, // Pass the index now
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
-              ),
-            ],
+                Positioned(
+                  top: -closeSize * 0.5,
+                  left: -closeSize * 0.25,
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: SizedBox(
+                      width: closeSize,
+                      height: closeSize,
+                      child: Image.asset(
+                        AppImages.roomback,
+                        width: closeSize,
+                        height: closeSize,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
