@@ -34,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool _hasInitialized = false;
   DateTime? _lastRefreshTime;
   int _headerKey = 0; // Key to force header rebuild
+  bool _canClaimDailyCoins = false;
 
   @override
   void initState() {
@@ -86,6 +87,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 _currentUser = localUser;
                 _headerKey++; // Force header rebuild again with new data
               });
+              _checkDailyBonusEligibility();
             }
             _loadUserData();
           });
@@ -127,6 +129,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 _currentUser = user;
                 _isLoading = false;
               });
+              _checkDailyBonusEligibility();
             }
           },
         );
@@ -152,6 +155,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 _currentUser = user;
                 _isLoading = false;
               });
+              _checkDailyBonusEligibility();
             }
           },
         );
@@ -168,6 +172,78 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         });
       }
     }
+  }
+
+  Future<void> _checkDailyBonusEligibility() async {
+    if (!mounted) return;
+    final result = await _userRepository.getDailyBonusStatus();
+    result.fold(
+      (_) {},
+      (data) {
+        if (mounted) {
+          setState(() {
+            _canClaimDailyCoins = data['canClaim'] ?? false;
+          });
+        }
+      },
+    );
+  }
+
+  Widget _buildCircleButton({
+    required Widget child,
+    required VoidCallback onTap,
+    bool showNotification = false,
+    required bool isTablet,
+    required double size,
+  }) {
+    final buttonSize = isTablet ? size * 0.32 : size * 0.3;
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        splashColor: Colors.white24,
+        highlightColor: Colors.white10,
+        child: SizedBox(
+          width: buttonSize,
+          height: buttonSize,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Image.asset(
+                AppImages.coinsss,
+                fit: BoxFit.contain,
+                width: buttonSize,
+                height: buttonSize,
+              ),
+              child,
+              if (showNotification)
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: Container(
+                    width: isTablet ? 14.r : 10.r,
+                    height: isTablet ? 14.r : 10.r,
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.redAccent.withOpacity(0.7),
+                          blurRadius: 8,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -194,6 +270,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   _currentUser = localUser;
                   _headerKey++; // Force header rebuild again with new data
                 });
+                _checkDailyBonusEligibility();
               }
               // Then refresh from server
               if (!_isLoading) {
@@ -264,140 +341,186 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                       alignment: Alignment.center,
                                       children: [
                                         Container(
-                                          width: circleSize,
-                                          height: circleSize,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            // 1. VIBRANT GRADIENT (The "Border" Color)
-                                            gradient: const LinearGradient(
-                                              colors: [
-                                                Colors.cyanAccent,
-                                                Colors.purpleAccent,
-                                                Colors.blueAccent,
-                                                Colors.cyanAccent,
-                                              ],
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                            ),
-                                            // 2. GLOW EFFECT
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.cyanAccent.withOpacity(0.4),
-                                                blurRadius: 10,
-                                                spreadRadius: 2,
+                                            width: circleSize,
+                                            height: circleSize,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: const Color(0xFF002547), // Inner dark blue background
+                                              border: Border.all(
+                                                color: const Color(0xFF00E5FF), // Neon cyan border
+                                                width: isTablet ? 4.w : 3.w,
                                               ),
-                                            ],
-                                          ),
-                                          // 3. BORDER WIDTH (Controlled by padding)
-                                          child: Padding(
-                                            padding: EdgeInsets.all(isTablet ? 4.w : 3.w), 
-                                            child: Container(
-                                              decoration: const BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                // 4. INNER BACKGROUND 
-                                                // (Necessary to "cut out" the center of the gradient)
-                                                color: Colors.black, // Or use Color(0xFF002547) to match your app theme
-                                              ),
-                                              child: Center(
-                                                child: Image.asset(
-                                                  AppImages.homelogoPng,
-                                                  width: circleSize * 0.80,
-                                                  height: circleSize * 0.80,
-                                                  fit: BoxFit.contain,
+                                              boxShadow: [
+                                                // Strong outer glow
+                                                BoxShadow(
+                                                  color: const Color(0xFF00E5FF).withOpacity(0.6),
+                                                  blurRadius: 30,
+                                                  spreadRadius: 6,
                                                 ),
+
+                                                // Soft ambient glow
+                                                BoxShadow(
+                                                  color: const Color(0xFF00E5FF).withOpacity(0.3),
+                                                  blurRadius: 15,
+                                                  spreadRadius: 2,
+                                                ),
+                                              ],
+                                            ),
+                                            child: Center(
+                                              child: Image.asset(
+                                                AppImages.homelogoPng,
+                                                width: circleSize * 0.75,
+                                                height: circleSize * 0.75,
+                                                fit: BoxFit.contain,
                                               ),
                                             ),
                                           ),
-                                        ),
                                         // Daily Coins Button
                                         Positioned(
                                           left: circleSize * 0.01,
                                           top: circleSize * 0.01,
-                                          child: Material(
-                                            color: Colors.transparent,
-                                            shape: const CircleBorder(),
-                                            child: InkWell(
-                                              onTap: () async {
-                                                await showDialog(
-                                                  context: context,
-                                                  barrierDismissible: true,
-                                                  barrierColor:
-                                                      Colors.black.withOpacity(0.8),
-                                                  builder: (_) => DailyCoinsPopup(
-                                                    onClaimed: (coins) {
-                                                      _loadUserData();
-                                                    },
-                                                  ),
-                                                );
-                                              },
-                                              customBorder: const CircleBorder(),
-                                              splashColor: Colors.white24,
-                                              highlightColor: Colors.white10,
-                                              child: SizedBox(
-                                                width: isTablet
-                                                    ? circleSize * 0.32
-                                                    : circleSize * 0.3,
-                                                height: isTablet
-                                                    ? circleSize * 0.32
-                                                    : circleSize * 0.3,
-                                                child: Image.asset(
-                                                  AppImages.dailycoins,
-                                                  fit: BoxFit.contain,
+                                          child: _buildCircleButton(
+                                            isTablet: isTablet,
+                                            size: circleSize,
+                                            showNotification: _canClaimDailyCoins,
+                                            onTap: () async {
+                                              await showDialog(
+                                                context: context,
+                                                barrierDismissible: true,
+                                                barrierColor:
+                                                    Colors.black.withOpacity(0.8),
+                                                builder: (_) => DailyCoinsPopup(
+                                                  onClaimed: (_) {
+                                                    _loadUserData();
+                                                  },
                                                 ),
-                                              ),
+                                              );
+                                            },
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  'GET',
+                                                  style: TextStyle(
+                                                    fontSize: isTablet ? 11.sp : 9.sp,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: Colors.white,
+                                                    shadows: const [
+                                                      Shadow(
+                                                        blurRadius: 2.5,
+                                                        color: Colors.black,
+                                                        offset: Offset(1.5, 1.5),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'DAILY',
+                                                  style: TextStyle(
+                                                    fontSize: isTablet ? 11.sp : 9.sp,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: Colors.white,
+                                                    shadows: const [
+                                                      Shadow(
+                                                        blurRadius: 2.5,
+                                                        color: Colors.black,
+                                                        offset: Offset(1.5, 1.5),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                Text(
+                                                  'COINS',
+                                                  style: TextStyle(
+                                                    fontSize: isTablet ? 11.sp : 9.sp,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: Colors.white,
+                                                    shadows: const [
+                                                      Shadow(
+                                                        blurRadius: 2.5,
+                                                        color: Colors.black,
+                                                        offset: Offset(1.5, 1.5),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ),
-                                        // AdsFree Button
+                                        // Ads Free Button
                                         Positioned(
                                           right: circleSize * 0.01,
                                           bottom: circleSize * 0.01,
-                                          child: Material(
-                                            color: Colors.transparent,
-                                            shape: const CircleBorder(),
-                                            child: InkWell(
-                                              onTap: () {
-                                                AdsFreePopup.show(
-                                                  context,
-                                                  onAdWatched: (coins) {
-                                                    VideoRewardDialog.show(
-                                                      context,
-                                                      coinsAwarded: coins,
-                                                      onComplete: () {
-                                                        NativeLogService.log(
-                                                          'Video animation completed after ad watched',
-                                                          tag: _logTag,
-                                                          level: 'debug',
-                                                        );
-                                                      },
-                                                    );
-                                                    // Refresh user data after ad watched
-                                                    _loadUserData();
-                                                  },
-                                                  onPurchaseComplete: () {
-                                                    // Refresh user data after purchase to update coin balance
-                                                    _loadUserData();
-                                                  },
-                                                );
-                                              },
-                                              customBorder: const CircleBorder(),
-                                              splashColor: Colors.white24,
-                                              highlightColor: Colors.white10,
-                                              child: SizedBox(
-                                                width: isTablet
-                                                    ? circleSize * 0.32
-                                                    : circleSize * 0.3,
-                                                height: isTablet
-                                                    ? circleSize * 0.32
-                                                    : circleSize * 0.3,
-                                                child: Image.asset(
-                                                  AppImages.adsfree,
-                                                  fit: BoxFit.contain,
+                                          child: _buildCircleButton(
+                                            isTablet: isTablet,
+                                            size: circleSize,
+                                            showNotification: false,
+                                            onTap: () {
+                                              AdsFreePopup.show(
+                                                context,
+                                                onAdWatched: (coins) {
+                                                  VideoRewardDialog.show(
+                                                    context,
+                                                    coinsAwarded: coins,
+                                                    onComplete: () {
+                                                      developer.log(
+                                                        'Video animation completed after ad watched',
+                                                        name: _logTag,
+                                                        level: 'debug',
+                                                      );
+                                                    },
+                                                  );
+                                                  _loadUserData();
+                                                },
+                                                onPurchaseComplete: () {
+                                                  _loadUserData();
+                                                },
+                                              );
+                                            },
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  'ADS',
+                                                  style: TextStyle(
+                                                    fontSize: isTablet ? 15.sp : 12.sp,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: Colors.white,
+                                                    shadows: const [
+                                                      Shadow(
+                                                        blurRadius: 2.5,
+                                                        color: Colors.black,
+                                                        offset: Offset(1.5, 1.5),
+                                                      ),
+                                                    ],
+                                                  ),
+>>>>>>> a905a4d (Changes P-2)
                                                 ),
-                                              ),
+                                                Text(
+                                                  'FREE',
+                                                  style: TextStyle(
+                                                    fontSize: isTablet ? 15.sp : 12.sp,
+                                                    fontWeight: FontWeight.w900,
+                                                    color: Colors.white,
+                                                    shadows: const [
+                                                      Shadow(
+                                                        blurRadius: 2.5,
+                                                        color: Colors.black,
+                                                        offset: Offset(1.5, 1.5),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
                                             ),
                                           ),
                                         ),
+
                                       ],
                                     );
                                   },

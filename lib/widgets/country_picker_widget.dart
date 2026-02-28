@@ -79,7 +79,7 @@ class CountryPickerWidget extends StatelessWidget {
     final isFilled = countryCode != null && countryCode.isNotEmpty;
 
     if (useGradientDesign) {
-      // Gradient design for profile_edit and guest_signup (matches _buildGradientDropdown)
+      // Gradient design for profile_edit and guest_signup (matches tablet country dropdown)
       return Container(
         width: width,
         height: height ?? (isTablet ? 60.h : 50.h),
@@ -89,8 +89,9 @@ class CountryPickerWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(15.r),
           gradient: const LinearGradient(
             colors: [
-              Color.fromRGBO(255, 255, 255, 0.8),
-              Color.fromRGBO(9, 189, 255, 0.8)
+              // Use full opacity to match tablet view styling
+              Color.fromRGBO(255, 255, 255, 1),
+              Color.fromRGBO(9, 189, 255, 1),
             ],
           ),
         ),
@@ -103,7 +104,8 @@ class CountryPickerWidget extends StatelessWidget {
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(13.r),
-                color: Colors.black.withOpacity(0.7),
+                // Solid black background to match tablet country field
+                color: Colors.black,
               ),
               child: Row(
                 children: [
@@ -266,7 +268,7 @@ class CountryPickerWidget extends StatelessWidget {
             color: Colors.white, // Always white to match others
             width: isTablet ? 2.0 : 1.w, // Match the 2.0 tablet width from MultiplayerScreen
           ),
-          color: const Color(0xFF0E0E0E),
+          color: Colors.black.withOpacity(0.35),
         ),
         child: Material(
           color: Colors.transparent,
@@ -298,7 +300,9 @@ class CountryPickerWidget extends StatelessWidget {
                         if (isFilled) ...[
                           Text(
                             getCountryFlag(countryCode),
-                            style: TextStyle(fontSize: isTablet ? 22.sp : 18.sp),
+                            style: TextStyle(
+                              fontSize: isTablet ? 18.sp : 14.sp,
+                            ),
                           ),
                           SizedBox(width: 8.w),
                         ],
@@ -311,7 +315,7 @@ class CountryPickerWidget extends StatelessWidget {
                             textAlign: TextAlign.left,
                             style: GoogleFonts.lato(
                               color: isFilled ? Colors.white : Colors.white54,
-                              fontSize: isTablet ? 22.0 : 13.sp, // Match the 22.0 font size
+                              fontSize: isTablet ? 18.0 : 12.sp,
                               fontWeight: FontWeight.w600,
                               height: 1.2,
                             ),

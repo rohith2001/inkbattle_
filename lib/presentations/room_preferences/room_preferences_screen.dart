@@ -11,8 +11,8 @@ import 'package:inkbattle_frontend/widgets/blue_background_scaffold.dart';
 import 'package:inkbattle_frontend/widgets/custom_svg.dart';
 import 'package:inkbattle_frontend/widgets/text_widget.dart';
 import 'package:inkbattle_frontend/widgets/persistent_banner_ad_widget.dart';
-import 'package:inkbattle_frontend/widgets/country_picker_widget.dart'; // Add this import
-import 'package:google_fonts/google_fonts.dart'; // Added for typography
+import 'package:google_fonts/google_fonts.dart';
+import 'widgets/room_country_picker.dart';
 import 'widgets/selection_bottom_sheet.dart';
 
 class RoomPreferencesScreen extends StatefulWidget {
@@ -463,7 +463,7 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
             Expanded(
               child: Center(
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: 800.w), // Constrain max width for tablet
+                  constraints: BoxConstraints(maxWidth: 600.w), // Constrain max width for tablet
                   child: Padding(
                     padding: EdgeInsets.symmetric(horizontal: 20.w), // Mobile padding
                     child: SingleChildScrollView(
@@ -497,14 +497,10 @@ class _RoomPreferencesScreenState extends State<RoomPreferencesScreen> {
                                 ),
                               ],
                               SizedBox(height: 20.h),
-                              CountryPickerWidget(
+                              RoomCountryPicker(
                                 selectedCountryCode: selectedCountry,
                                 onCountrySelected: (code) => setState(() => selectedCountry = code),
                                 hintText: AppLocalizations.country,
-                                icon: Icons.public,
-                                iconColor: const Color(0xFF09BDFF),
-                                useGradientDesign: true,
-                                height: 58.h,
                               ),
                               if (_showFieldErrors && selectedCountry == null) ...[
                                 SizedBox(height: 4.h),

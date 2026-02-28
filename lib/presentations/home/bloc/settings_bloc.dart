@@ -30,7 +30,6 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
 
   // Shared player ONLY for preview volume
   final AudioPlayer audioPlayer = AudioPlayer();
-
   SettingsBloc() : super(SettingsState(soundValue: 1.0)) {
     on<SettingsInitialEvent>(_onSettingsInitial);
     on<UpdateSoundValue>(_onUpdateSoundValue);

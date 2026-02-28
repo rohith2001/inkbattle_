@@ -3,12 +3,13 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
+import 'dart:developer' as developer;
 import 'dart:convert'; // Required if you want to pretty-print the map as JSON
 
 import 'dart:math' as math;
 import 'dart:ui';
 import 'dart:ui' as ui;
-import 'package:inkbattle_frontend/services/native_log_service.dart';
+import 'dart:developer' as developer;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,8 +31,6 @@ import 'package:inkbattle_frontend/services/socket_service.dart';
 import 'package:inkbattle_frontend/widgets/persistent_banner_ad_widget.dart';
 import 'package:inkbattle_frontend/widgets/blue_background_scaffold.dart';
 import 'package:inkbattle_frontend/widgets/country_picker_widget.dart';
-import 'package:inkbattle_frontend/presentations/room_preferences/widgets/selection_bottom_sheet.dart';
-import 'package:inkbattle_frontend/presentations/room_preferences/widgets/room_category_picker_sheet.dart';
 import 'package:inkbattle_frontend/presentations/drawing_board/presentation/widgets/drawing_canvas.dart';
 import 'package:inkbattle_frontend/presentations/drawing_board/domain/models/stroke.dart'
     as fdb;
@@ -102,12 +101,6 @@ enum DrawingTool {
   rectangle,
   filledRectangle,
   colorPicker,
-}
-
-/// Connection state for interaction safety: block game actions until room_joined has applied authoritative state.
-enum GameConnectionState {
-  syncing, // Socket connected but game state not yet valid (e.g. after reconnect, before room_joined)
-  ready,  // Safe to interact (room_joined received)
 }
 
 class _PhaseBorderPainter extends CustomPainter {
@@ -273,16 +266,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   double _strokeWidth = 3.0;
   bool _isDrawer = false;
   bool _wasDrawerWhenGameEnded = false;
-
-  /// Frontend role guard: true only when current user is the room's drawer (myId == drawerId).
-  /// Use this for drawer-only UI so guesser never sees color box / tools even if backend glitches.
-  bool get _amIDrawer {
-    if (_currentUser?.id == null) return false;
-    final myId = _currentUser!.id;
-    final drawerId = _room?.currentDrawerId ?? _currentDrawerInfo?['id'];
-    if (drawerId == null) return false;
-    return myId == drawerId || myId.toString() == drawerId.toString();
-  }
   int? _lastRoundGuessedCount;
   int? _lastRoundTotalGuessers;
   String? _currentWord;
@@ -311,17 +294,11 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   String? missedTheirTurn;
 
   Timer? _teamScoreboardTimer;
-  Timer? _phaseCountdownTimer; // Local countdown from phaseEndTime (no per-second server time_update)
-  int? _phaseEndTimeMs; // Epoch ms when phase ends; used for smooth progress bar
-  Timer? _progressSmoothTimer; // Updates progress bar every ~100ms for smooth drain
-  static const Duration _progressSmoothInterval = Duration(milliseconds: 50);
-  final ValueNotifier<double> _progressValue = ValueNotifier<double>(0.0);
   bool _showTeamScoreboard = false;
   bool _hasShownTeamScoreIntro = false;
   bool _isLeaderboardVisible = false;
   bool _showPencilTools = false;
   bool _isGameEnded = false;
-  bool _isPostGameTransition = false; // Loading overlay from game end → coins → leaderboard → ad → lobby
   bool _shouldExitAfterAd = false;
   bool _isShowingAd = false;
   bool _isWaitingForHostOrMembers = false; // Track if we're waiting for host/members after returning to lobby
@@ -429,13 +406,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   int _phaseMaxTime = 60; // Store max time for border calculation
   List<String>? _wordOptions;
 
-  // State-based join dedupe: skip join only when we're still in this room (haven't left)
-  String? _lastJoinRoomId;
-  bool _hasLeftCurrentRoom = true; // true until we've joined; after leave, true again
-  int _serverSyncingRetryCount = 0; // cap retries when server sends server_syncing after restart
-  bool _rejoinInProgress = false; // guard: prevent duplicate re-join when reconnect fires multiple times
-  GameConnectionState _connectionState = GameConnectionState.syncing; // ready only after room_joined (blocks actions during reconnect window)
-
+  // Animation for smooth timer border
+  late AnimationController _progressAnimationController;
+  late Animation<double> _progressAnimation;
   String? _wordHint;
   String? _currentWordForDashes; // Word length for dashes
 
@@ -525,6 +498,18 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     ]).animate(_pointsAnimationController);
     /*  } points animation in gameArena UI  */
 
+    // Initialize progress animation controller
+    _progressAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _progressAnimation = Tween<double>(begin: 0.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _progressAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
     _announcementManager = RoundAnnouncementManager(
       context: context,
       onAllComplete: () {},
@@ -593,7 +578,8 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       }
       
     } catch (e) {
-      NativeLogService.log('Error preloading videos: $e', tag: _logTag, level: 'error');      
+      
+      
     }
   }
 
@@ -766,177 +752,46 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       _handleAppResumed();
     } else if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       // Pause phase videos when app goes to background so interval/phase sound doesn't keep playing
-      _stopAllPhaseMedia();
-      // Cancel smooth progress timer only (keep _phaseEndTimeMs so we can restart on resume)
-      _progressSmoothTimer?.cancel();
-      _progressSmoothTimer = null;
+      _intervalVideoController?.pause();
+      _whosNextVideoController?.pause();
+      _welldoneVideoController?.pause();
+      _timeupVideoController?.pause();
+      _lostTurnVideoController?.pause();
     }
-  }
-
-  /// Clears snackbars, round overlays, and phase media on resume (immediate + delayed passes).
-  void _clearUiAndMediaOnResume() {
-    ScaffoldMessenger.of(context).clearSnackBars();
-    _announcementManager.clearSequence();
-    _stopAllPhaseMedia();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        _stopAllPhaseMedia();
-      }
-    });
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        _stopAllPhaseMedia();
-      }
-    });
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        _stopAllPhaseMedia();
-      }
-    });
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
-        _stopAllPhaseMedia();
-      }
-    });
-  }
-
-  /// Handles getRoomDetails failure (404 retry + exit, non-404 stay in room and trust socket).
-  void _handleGetRoomDetailsFailure(dynamic failure) {
-    NativeLogService.log(
-      "Failed to fetch room details: ${failure.message}",
-      tag: _logTag,
-      level: 'error'
-    );
-    final errorMessage = failure.message.toLowerCase();
-    if (errorMessage.contains('not found') ||
-        errorMessage.contains('404') ||
-        errorMessage.contains('room not found')) {
-      Future.delayed(const Duration(seconds: 1), () async {
-        if (!mounted) {
-          if (_isResuming) {
-            setState(() => _isResuming = false);
-          }
-          return;
-        }
-        try {
-          final retryResult = await _roomRepository.getRoomDetails(roomId: widget.roomId)
-              .timeout(
-                const Duration(seconds: 8),
-                onTimeout: () {
-                  throw TimeoutException('Retry request timed out');
-                },
-              );
-          retryResult.fold(
-            (retryFailure) {
-              final retryError = retryFailure.message.toLowerCase();
-              if (retryError.contains('not found') ||
-                  retryError.contains('404') ||
-                  retryError.contains('room not found')) {
-                if (mounted) {
-                  setState(() => _isResuming = false);
-                  _showAdAndExit();
-                }
-              } else {
-                if (mounted) {
-                  setState(() => _isResuming = false);
-                }
-              }
-            },
-            (retryRoom) {
-              if (mounted) {
-                setState(() {
-                  _room = retryRoom;
-                  _waitingForPlayers = retryRoom.status == 'lobby' || retryRoom.status == 'waiting';
-                  _isResuming = false;
-                });
-                if (retryRoom.status == 'playing') {
-                  _socketService.socket?.emit('request_canvas_data', {'roomCode': retryRoom.code});
-                }
-              }
-            },
-          );
-        } catch (e) {
-          NativeLogService.log(
-            "Retry error: $e - staying in room",
-            tag: _logTag,
-            level: 'error'
-          );
-          if (mounted) {
-            setState(() => _isResuming = false);
-          }
-        }
-      });
-    } else {
-      NativeLogService.log(
-        "Non-404 error, staying in room and trusting socket connection",
-        tag: _logTag,
-        level: 'debug'
-      );
-      if (mounted) {
-        setState(() => _isResuming = false);
-      }
-      if (_room?.status == 'playing' && _room?.code != null) {
-        _socketService.socket?.emit('request_canvas_data', {'roomCode': _room!.code});
-      }
-    }
-  }
-
-  /// Applies room state from getRoomDetails success (phase, drawer, round, canvas invalidation).
-  void _applyRoomStateAfterResume(RoomModel room) {
-    setState(() {
-      _room = room;
-      _waitingForPlayers = room.status == 'lobby' || room.status == 'waiting';
-      _isResuming = false;
-      if (room.status == 'lobby' || room.status == 'waiting') {
-        _isGameEnded = false;
-        _isPostGameTransition = false;
-        _isWaitingForHostOrMembers = true;
-      }
-      if (room.status == 'closed' || room.status == 'inactive') {
-        _waitingForPlayers = true;
-        _isGameEnded = false;
-        _isPostGameTransition = false;
-      }
-      // Sync current phase and remaining from room (uses roundPhaseEndTime so we stay in sync)
-      if (room.status == 'playing' && room.roundPhase != null) {
-        _currentPhase = room.roundPhase;
-        final rem = _remainingSecondsFromRoom(room);
-        if (rem != null) _phaseTimeRemaining = rem;
-        _waitingForPlayers = false;
-        // Sync drawer role from server (source of truth after resume / re-join)
-        final drawerId = room.currentDrawerId;
-        _isDrawer = _currentUser?.id != null &&
-            (drawerId == _currentUser!.id ||
-                drawerId.toString() == _currentUser!.id.toString());
-        // When not drawer, clear drawer-only state so guesser doesn't see colors/options
-        if (!_isDrawer) {
-          _wordOptions = null;
-          _isWordSelectionDialogVisible = false;
-          _currentDrawerInfo = null;
-        }
-        // Session-scoped canvas invalidation: keep strokes only if still drawer AND same round
-        if (_shouldClearCanvasAfterSync(room, _isDrawer)) {
-          _clearCanvasState();
-        }
-        _lastKnownRoundNumber = room.currentRound;
-      }
-    });
   }
 
   Future<void> _handleAppResumed() async {
     if (!mounted) return;
-    _clearUiAndMediaOnResume();
+
+    // Clear past overlays and stop any phase video/sound so we don't show or hear past state
+    ScaffoldMessenger.of(context).clearSnackBars();
+    _announcementManager.clearSequence();
+    _intervalVideoController?.pause();
+    _whosNextVideoController?.pause();
+    _welldoneVideoController?.pause();
+    _timeupVideoController?.pause();
+    _lostTurnVideoController?.pause();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).clearSnackBars();
+      }
+    });
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) ScaffoldMessenger.of(context).clearSnackBars();
+    });
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) ScaffoldMessenger.of(context).clearSnackBars();
+    });
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) ScaffoldMessenger.of(context).clearSnackBars();
+    });
 
     // Don't check room status if game has ended and we're showing ad/leaderboard
     if (_isGameEnded) {
-      NativeLogService.log(
+      developer.log(
         "Game ended - skipping room check on resume",
-        tag: _logTag,
-        level: 'debug'
+        name: _logTag,
       );
       return;
     }
@@ -946,10 +801,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     // SAFEGUARD: ensure loading never runs forever (participant can get stuck otherwise)
     Future.delayed(const Duration(seconds: 12), () {
       if (mounted && _isResuming) {
-        NativeLogService.log(
+        developer.log(
           "Resume timeout - turning off loading indicator",
-          tag: _logTag,
-          level: 'debug'
+          name: _logTag,
         );
         setState(() => _isResuming = false);
       }
@@ -958,14 +812,53 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     try {
       await Future.delayed(const Duration(milliseconds: 200));
 
-      // Single socket + auto-reconnect: do NOT create new socket on resume. Same socket reconnects; listeners stay attached.
-      if (_socketService.socket?.connected == true) {
+      // Reconnect Socket if disconnected - this is the primary way to stay in the room
+      if (_socketService.socket?.connected != true) {
+        developer.log(
+          "Socket disconnected, attempting to reconnect...",
+          name: _logTag,
+        );
+      
+        // Fetch token and properly reconnect
+        final token = await LocalStorageUtils.fetchToken();
+        if (token != null && token.isNotEmpty) {
+          _socketService.connect(token);
+          
+          // Wait for connection with timeout
+          int attempts = 0;
+          while (attempts < 10 && (_socketService.socket?.connected != true)) {
+            await Future.delayed(const Duration(milliseconds: 200));
+            attempts++;
+          }
+          
+          if (_socketService.socket?.connected == true) {
+            // Wait a bit more to ensure socket is fully authenticated before joining
+            await Future.delayed(const Duration(milliseconds: 300));
+            _socketService.joinRoom(
+              widget.roomId,
+              team: widget.selectedTeam != null && selectedGameMode == 'team_vs_team'
+                  ? widget.selectedTeam
+                  : null,
+            );
+          } else {
+            developer.log(
+              "Failed to reconnect socket after resume",
+              name: _logTag,
+            );
+          }
+        }
+      } else {
+        // Even if connected, re-join to ensure we're still registered in the room
+        // Add small delay to ensure socket is fully ready
         await Future.delayed(const Duration(milliseconds: 300));
-        if (!mounted) return;
-        _joinRoomIfNotRecent();
+        _socketService.joinRoom(
+          widget.roomId,
+          team: widget.selectedTeam != null && selectedGameMode == 'team_vs_team'
+              ? widget.selectedTeam
+              : null,
+        );
       }
-      // If disconnected: same socket instance will auto-reconnect; setOnReconnect callback will re-join (room_joined carries phase).
-
+      
       // Try to validate room status; short timeout so participant doesn't get stuck
       final roomResult = await _roomRepository.getRoomDetails(roomId: widget.roomId)
           .timeout(
@@ -981,16 +874,118 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       }
 
       roomResult.fold(
-      _handleGetRoomDetailsFailure,
-      (room) {
+      (failure) {
+        // Only exit if it's a 404 (Room not found).
+        // If it's a network error, we stay in the screen and let the socket try to sync.
+        developer.log(
+          "Failed to fetch room details: ${failure.message}",
+          name: _logTag,
+        );
 
-        _applyRoomStateAfterResume(room);
-        // Clear any stuck round overlays (all phases including reveal) so resume doesn't show past state
-        if (room.status == 'playing') {
-          _announcementManager.clearSequence();
-          if (!_isDrawer) _cancelWordSelectionCountdown();
+        // Only exit on confirmed 404 - room truly doesn't exist
+        // For all other errors (network, auth, etc.), stay in the screen and trust the socket
+        final errorMessage = failure.message.toLowerCase();
+        if (errorMessage.contains('not found') || 
+            errorMessage.contains('404') ||
+            errorMessage.contains('room not found')) {
+          // Double-check: wait a bit and retry once more before exiting
+          Future.delayed(const Duration(seconds: 1), () async {
+            if (!mounted) {
+              // Ensure loading is turned off if widget is disposed
+              if (_isResuming) {
+                setState(() => _isResuming = false);
+              }
+              return;
+            }
+            try {
+              final retryResult = await _roomRepository.getRoomDetails(roomId: widget.roomId)
+                  .timeout(
+                    const Duration(seconds: 8),
+                    onTimeout: () {
+                      throw TimeoutException('Retry request timed out');
+                    },
+                  );
+              retryResult.fold(
+                (retryFailure) {
+                  final retryError = retryFailure.message.toLowerCase();
+                  if (retryError.contains('not found') || 
+                      retryError.contains('404') ||
+                      retryError.contains('room not found')) {
+                    // Confirmed 404, exit
+                    if (mounted) {
+                      setState(() => _isResuming = false);
+                      _showAdAndExit();
+                    }
+                  } else {
+                    // Not a 404, stay in room
+                    if (mounted) {
+                      setState(() => _isResuming = false);
+                    }
+                  }
+                },
+                (retryRoom) {
+                  // Room found on retry, continue
+                  if (mounted) {
+                    setState(() {
+                      _room = retryRoom;
+                      _waitingForPlayers = retryRoom.status == 'lobby' || retryRoom.status == 'waiting';
+                      _isResuming = false;
+                    });
+                    if (retryRoom.status == 'playing') {
+                      _socketService.socket?.emit('request_canvas_data', {'roomCode': retryRoom.code});
+                    }
+                  }
+                },
+              );
+            } catch (e) {
+              // Timeout or other error - turn off loading and stay in room
+              developer.log(
+                "Retry error: $e - staying in room",
+                name: _logTag,
+              );
+              if (mounted) {
+                setState(() => _isResuming = false);
+              }
+            }
+          });
+        } else {
+          // Not a 404 error - likely network or temporary issue
+          // Stay in the room and trust the socket connection
+          developer.log(
+            "Non-404 error, staying in room and trusting socket connection",
+            name: _logTag,
+          );
+          if (mounted) {
+            setState(() => _isResuming = false);
+          }
+          // Request canvas data if we were playing
+          if (_room?.status == 'playing' && _room?.code != null) {
+            _socketService.socket?.emit('request_canvas_data', {'roomCode': _room!.code});
+          }
         }
-
+      },
+      (room) {
+        // Room found - sync current playing state so UI shows current phase (drawing, interval, etc.), not past
+        setState(() {
+          _room = room;
+          _waitingForPlayers = room.status == 'lobby' || room.status == 'waiting';
+          _isResuming = false;
+          if (room.status == 'lobby' || room.status == 'waiting') {
+            _isGameEnded = false;
+            _isWaitingForHostOrMembers = true;
+          }
+          if (room.status == 'closed' || room.status == 'inactive') {
+            _waitingForPlayers = true;
+            _isGameEnded = false;
+          }
+          // Sync current phase from server so we show current state (drawing/interval/etc.), not stale
+          if (room.status == 'playing' && room.roundPhase != null) {
+            _currentPhase = room.roundPhase;
+            final rem = _remainingSecondsFromRoom(room);
+            if (rem != null) _phaseTimeRemaining = rem;
+            _waitingForPlayers = false;
+          }
+        });
         if (room.status == 'closed' || room.status == 'inactive') {
           Future.delayed(const Duration(milliseconds: 300), () {
             if (mounted) _showAdAndExit();
@@ -1003,10 +998,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       },
     );
     } catch (e) {
-      NativeLogService.log(
+      developer.log(
         "Exception during resume check: $e - staying in room",
-        tag: _logTag,
-        level: 'error'
+        name: _logTag,
       );
       if (mounted) setState(() => _isResuming = false);
       if (_room?.status == 'playing' && _room?.code != null) {
@@ -1055,11 +1049,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   // Canvas versioning for race condition prevention
   int _canvasVersion = 0;  // Increments when canvas is cleared
   int _strokeSequenceNumber = 0;  // Increments for each stroke packet
-  /// After canvas_resume, ignore drawing_data with sequence <= this until next phase (avoids duplicates).
-  int _lastSequenceFromSnapshot = -1;
-  /// Last round number we synced (for session-scoped state: clear canvas when round changes on resume).
-  int? _lastKnownRoundNumber;
-
+  
   // Acknowledgment system for reliability
   final Map<int, Map<String, dynamic>> _pendingStrokes = {};  // Track pending strokes by sequence number
   final Map<int, Timer> _retryTimers = {};  // Track retry timers
@@ -1076,7 +1066,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     try {
       final userResult = await _userRepository.getMe();
       userResult.fold(
-        (failure) => NativeLogService.log('Failed to get user', tag: _logTag, level: 'error'),
+        (failure) => developer.log('Failed to get user', name: _logTag),
         (user) => _currentUser = user,
       );
 
@@ -1322,86 +1312,20 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     return _speakingInGameUserIds.contains(agoraUid);
   }
 
-  /// Emit join_room only when we're not already in this room (state-based: skip if same room and we haven't left).
-  /// Backend also treats same socket+room as idempotent, so duplicate join is safe but we avoid duplicate events.
-  void _joinRoomIfNotRecent() {
-    if (_lastJoinRoomId == widget.roomId && !_hasLeftCurrentRoom) {
-      NativeLogService.log(
-        'Skipping duplicate join_room for ${widget.roomId} (already in room, no leave since join)',
-        tag: _logTag,
-        level: 'debug'
-      );
-      return;
-    }
-    _lastJoinRoomId = widget.roomId;
-    _hasLeftCurrentRoom = false;
+  Future<void> _connectSocket() async {
+    final token = await LocalStorageUtils.fetchToken();
+    if (token == null || token.isEmpty) return;
+
+    _socketService.connect(token);
     _socketService.joinRoom(
       widget.roomId,
       team: widget.selectedTeam != null && selectedGameMode == 'team_vs_team'
           ? widget.selectedTeam
           : null,
     );
-  }
-
-  /// Marks that we left the current room so the next join is allowed (not skipped as duplicate).
-  /// Called on: explicit leave (_leaveRoom), dispose, and on app resume when socket was disconnected.
-  void _markLeftCurrentRoom() {
-    _hasLeftCurrentRoom = true;
-  }
-
-  Future<void> _connectSocket() async {
-    final token = await LocalStorageUtils.fetchToken();
-    if (token == null || token.isEmpty) return;
-
-    final didCreateSocket = _socketService.connect(token);
-    _joinRoomIfNotRecent();
-    // Register listeners only when a new socket was created (avoids duplicate listeners).
-    if (didCreateSocket) {
-      _registerSocketListeners();
-    }
-    _socketService.setOnDisconnect(() {
-      if (mounted) setState(() => _connectionState = GameConnectionState.syncing);
-    });
-    // Set reconnect callback whenever we're on game screen (same socket reconnects → re-join; room_joined carries phase).
-    _socketService.setOnReconnect(() {
-      if (!mounted) return;
-      setState(() => _connectionState = GameConnectionState.syncing);
-      if (_rejoinInProgress) return;
-      _rejoinInProgress = true;
-      _markLeftCurrentRoom();
-      _joinRoomIfNotRecent();
-      // Clear guard when room_joined is received, or after timeout in case it never arrives
-      Future.delayed(const Duration(seconds: 5), () {
-        if (mounted) setState(() => _rejoinInProgress = false);
-      });
-    });
-  }
-
-  /// Registers all socket listeners once. Same socket instance auto-reconnects on resume; no re-registration needed.
-  void _registerSocketListeners() {
-    _socketService.onServerSyncing(() {
-      if (!mounted) return;
-      if (_serverSyncingRetryCount >= 3) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Server is syncing. Please try again in a moment.'),
-              duration: Duration(seconds: 3),
-            ),
-          );
-        }
-        return;
-      }
-      _serverSyncingRetryCount++;
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) _joinRoomIfNotRecent();
-      });
-    });
 
     _socketService.onRoomJoined((data) {
       if (mounted) {
-        _serverSyncingRetryCount = 0; // reset on successful join
-        _rejoinInProgress = false; // allow next re-join after reconnect
         final room = data['room'];
         final participants = data['participants'] as List?;
         final isResuming = data['isResuming'] == true;
@@ -1419,88 +1343,30 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             if (_room != null) _room!.status = roomStatus;
             if (roomStatus == 'lobby' || roomStatus == 'waiting') {
               _isGameEnded = false;
-              _isPostGameTransition = false;
               _isWaitingForHostOrMembers = true;
               _isResuming = false; // Clear resume overlay so lobby works after user resumes app
             }
             if (isResuming && (roomStatus == 'lobby' || roomStatus == 'waiting')) {
               _isGameEnded = false;
-              _isPostGameTransition = false;
               _isWaitingForHostOrMembers = true;
             }
             if (roomStatus == 'playing') {
               _waitingForPlayers = false;
-              // Sync drawer role from server (source of truth after reconnect).
-              final drawerId = room['currentDrawerId'];
-              _isDrawer = _currentUser?.id != null &&
-                  (drawerId == _currentUser!.id ||
-                      drawerId.toString() == _currentUser!.id.toString());
-              // Sync current phase and remaining from server; use roundPhaseEndTime so we stay in sync even if message is delayed.
+              // Sync current phase from server; remaining from roundPhaseEndTime when present (backend no-per-second DB)
               final roundPhase = room['roundPhase'] as String?;
-
-              final roomMap = room is Map<String, dynamic> ? room : null;
-              final roundPhaseEndTimeMs = roomMap?['roundPhaseEndTime'];
-
+              final roundRemaining = _remainingSecondsFromRoomMap(room is Map<String, dynamic> ? room : null);
               if (roundPhase != null) _currentPhase = roundPhase;
-              // Keep _phaseMaxTime as phase duration (for progress bar). Use server roundDuration if present.
-              final roundDuration = roomMap?['roundDuration'];
-              if (roundDuration != null) {
-                _phaseMaxTime = roundDuration is int
-                    ? roundDuration
-                    : (roundDuration as num).toInt();
-                if (_phaseMaxTime <= 0) _phaseMaxTime = 60;
-              }
-              // Set initial remaining from roundPhaseEndTime (end - now) so first paint is correct; fallback to _remainingSecondsFromRoomMap.
-              if (roundPhaseEndTimeMs != null && (roundPhaseEndTimeMs is int || roundPhaseEndTimeMs is num)) {
-                final endMs = (roundPhaseEndTimeMs as num).toInt();
-                final now = DateTime.now().millisecondsSinceEpoch;
-                _phaseTimeRemaining = ((endMs - now) / 1000).ceil().clamp(0, _phaseMaxTime);
-              } else {
-                final roundRemaining = _remainingSecondsFromRoomMap(roomMap);
-                if (roundRemaining != null) _phaseTimeRemaining = roundRemaining;
-              }
-              // Start local phase countdown from roundPhaseEndTime so timer stays in sync without per-second server time_update
-              if (roundPhaseEndTimeMs != null && (roundPhaseEndTimeMs is int || roundPhaseEndTimeMs is num) && mounted) {
-                _phaseCountdownTimer?.cancel();
-                _phaseCountdownTimer = null;
-                final endMs = (roundPhaseEndTimeMs as num).toInt();
-                _phaseCountdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-                  if (!mounted) return;
-                  final now = DateTime.now().millisecondsSinceEpoch;
-                  final rem = ((endMs - now) / 1000).ceil().clamp(0, _phaseMaxTime);
-                  setState(() {
-                    _phaseTimeRemaining = rem;
-                  });
-                  if (rem <= 0) {
-                    _phaseCountdownTimer?.cancel();
-                    _phaseCountdownTimer = null;
-                    _stopProgressSmoothTimer();
-                  }
-                });
-                _startProgressSmoothTimer(endMs);
-              }
-              _lastKnownRoundNumber = _room?.currentRound;
+              if (roundRemaining != null) _phaseTimeRemaining = roundRemaining;
             }
           }
-          _connectionState = GameConnectionState.ready; // safe to interact after room_joined applied
         });
-
-        // When syncing to a playing room, clear any stuck compliment overlay (all phases including reveal, e.g. after resume)
-        if (room != null && room['status'] == 'playing') {
-          _announcementManager.clearSequence();
-        }
-        // Sync progress only when we did NOT start the smooth timer (smooth timer already set initial value)
+        // Sync progress animation to current remaining so no glitch (full then correct) on resume
         if (room != null && room['status'] == 'playing' && _phaseMaxTime > 0) {
-          final roomMap = room is Map<String, dynamic> ? room : null;
-          final hadPhaseEndTime = roomMap?['roundPhaseEndTime'] != null;
-          if (!hadPhaseEndTime) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (!mounted) return;
-              final progress = (_phaseTimeRemaining / _phaseMaxTime).clamp(0.0, 1.0);
-              _updateProgressAnimation(progress, immediate: true);
-            });
-          }
-
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            final progress = (_phaseTimeRemaining / _phaseMaxTime).clamp(0.0, 1.0);
+            _updateProgressAnimation(progress);
+          });
         }
         // If room is already playing (e.g. host started while we were in ad, or after resume), sync canvas and phase
         if (room != null && room['status'] == 'playing' && _room?.code != null) {
@@ -1758,17 +1624,11 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       try {
         if (data is! Map<String, dynamic>) return;
 
-        // Ignore strokes already in snapshot (avoids duplicates after canvas_resume)
-        final int packetSeq = (data['sequence'] as int?) ?? -1;
-        if (_lastSequenceFromSnapshot >= 0 && packetSeq <= _lastSequenceFromSnapshot) {
-          return;
-        }
-
         // Check canvas version to prevent race conditions
         // If this packet is from an old canvas version (before clear), ignore it
         final int packetCanvasVersion = (data['canvasVersion'] as int?) ?? 0;
         if (packetCanvasVersion < _canvasVersion) {
-          NativeLogService.log("Ignoring drawing packet from old canvas version: $packetCanvasVersion < $_canvasVersion", tag: _logTag, level: 'debug');
+          developer.log("Ignoring drawing packet from old canvas version: $packetCanvasVersion < $_canvasVersion", name: _logTag);
           return;  // Ignore packets from before canvas was cleared
         }
 
@@ -1792,15 +1652,13 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         }
       } catch (e, stackTrace) {
         // Improved error handling with stack trace
-        NativeLogService.log(
+        developer.log(
           "Error handling drawing data: $e",
-          tag: _logTag,
-          level: 'error'
+          name: _logTag,
         );
-        NativeLogService.log(
+        developer.log(
           "Stack trace: $stackTrace",
-          tag: _logTag,
-          level: 'error'
+          name: _logTag,
         );
         // Don't crash the app, just log the error
       }
@@ -1822,15 +1680,13 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         }
       } catch (e, stackTrace) {
         // Improved error handling
-        NativeLogService.log(
+        developer.log(
           "Error handling drawing ack: $e",
-          tag: _logTag,
-          level: 'error'
+          name: _logTag,
         );
-        NativeLogService.log(
+        developer.log(
           "Stack trace: $stackTrace",
-          tag: _logTag,
-          level: 'error'
+          name: _logTag,
         );
       }
     });
@@ -1845,10 +1701,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           _strokes.value = [];
           _currentStroke.clear();
         });
-        NativeLogService.log(
+        developer.log(
           "Canvas cleared, version updated to: $_canvasVersion",
-          tag: _logTag,
-          level: 'debug'
+          name: _logTag,
         );
       }
     });
@@ -1971,10 +1826,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                   m['type'] == 'incorrect');
 
               if (existingIndex == -1) {
-                NativeLogService.log(
+                developer.log(
                     '${_currentUser?.avatar ?? _currentUser?.profilePicture}',
-                    tag: _logTag,
-                    level: 'debug'
+                    name: _logTag,
                   );
                 _answersChatMessages.add({
                   'type': 'incorrect',
@@ -2046,10 +1900,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     });
 
     _socketService.onSettingsUpdated((data) {
-      NativeLogService.log(
+      developer.log(
           'Received settings_updated event with data: ${data['maxPlayers']}',
-          tag: _logTag,
-          level: 'debug'
+          name: _logTag,
         );
       if (mounted) {
         setState(() {
@@ -2204,14 +2057,18 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     });
 
     _socketService.onPhaseChange((data) {
+      // #region agent log
+      print('--- AGENT LOG: onPhaseChange [H2/run1] ---');
+      print('Source: game_room_screen.dart');
+      print(const JsonEncoder.withIndent('  ').convert({
+        'phase': data['phase'],
+        'duration': data['duration'],
+        'drawer': data['drawer'],
+      }));
+      print('---------------------------------------');
+      // #endregion
       if (mounted) {
         final String? nextPhase = data['phase'] as String?;
-        if (nextPhase == null || nextPhase.isEmpty) return;
-
-        // Cancel previous phase countdown (client runs local countdown from phaseEndTime)
-        _phaseCountdownTimer?.cancel();
-        _phaseCountdownTimer = null;
-        _stopProgressSmoothTimer();
 
         // CRITICAL: Save board size BEFORE any state changes
         final savedSize = _drawerBoardSize != Size.zero
@@ -2219,26 +2076,10 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             : _lastKnownBoardSize;
         final lastPhase = _currentPhase;
         final lastPhaseTimeRemaining = _phaseTimeRemaining;
-        final duration = (data['duration'] is int)
-            ? (data['duration'] as int)
-            : (data['duration'] as num?)?.toInt() ?? 0;
-        final phaseEndTimeMs = data['phaseEndTime'];
-        final phaseMax = duration > 0 ? duration : 60;
-        // Set initial remaining from phaseEndTime (end - now) so we stay in sync even if message is delayed.
-        final int initialRemaining;
-        if (phaseEndTimeMs != null && (phaseEndTimeMs is int || phaseEndTimeMs is num)) {
-          final endMs = (phaseEndTimeMs as num).toInt();
-          final now = DateTime.now().millisecondsSinceEpoch;
-          initialRemaining = ((endMs - now) / 1000).ceil().clamp(0, phaseMax);
-        } else {
-          initialRemaining = duration;
-        }
         setState(() {
           _currentPhase = nextPhase;
-          _phaseTimeRemaining = initialRemaining;
-          _phaseMaxTime = phaseMax;
-          // Reset snapshot seq filter on phase change so next round/phase is clean
-          _lastSequenceFromSnapshot = -1;
+          _phaseTimeRemaining = data['duration'] ?? 0;
+          _phaseMaxTime = data['duration'] ?? 60;
 
           if (data['drawer'] is Map<String, dynamic>) {
             _currentDrawerInfo = Map<String, dynamic>.from(
@@ -2259,8 +2100,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             _showWordHint = false;
             // _chatMessages.clear();
             _currentDrawerMessageKey = null;
-            // Reset who guessed this round so new drawing round starts clean
-            _usersWhoAnswered.clear();
 
             // Clear canvas but PRESERVE size
             _strokes.value = [];
@@ -2272,8 +2111,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             // Pause interval/whosNext so drawer does not hear them while drawing
             _intervalVideoController?.pause();
             _whosNextVideoController?.pause();
-            // Remove any stuck compliment overlay from previous reveal (e.g. after resume)
-            _announcementManager.clearSequence();
           } else if (nextPhase == 'reveal') {
             _isIntervalPhase = false;
             _currentWord = data['word'];
@@ -2320,15 +2157,17 @@ class _GameRoomScreenState extends State<GameRoomScreen>
               //     _announcementManager.startAnnouncementSequence(isTimeUp: false, showOverlay2Soon: true);
               //   });
               // } else {
-              //   // Even when the drawer does not earn points (e.g. nobody guessed),
-              //   // still show the time-up / compliment sequence promptly so they
-              //   // see feedback for their drawing.
-                Future.delayed(const Duration(milliseconds: 400), () {
+              //   final revealDurationSec = _phaseTimeRemaining > 0 ? _phaseTimeRemaining : 1;
+              //   Future.delayed(Duration(seconds: revealDurationSec), () {
+              //     if (!mounted || _currentPhase != 'reveal') return;
+              //     _announcementManager.startAnnouncementSequence(isTimeUp: isTimeUp);
+              //   });
+              // }
+              Future.delayed(const Duration(milliseconds: 400), () {
                   if (!mounted || _currentPhase != 'reveal') return;
                   // _announcementManager.startAnnouncementSequence(isTimeUp: isTimeUp);
                   _announcementManager.startAnnouncementSequence(isTimeUp: false, showOverlay2Soon: true);
                 });
-              // }
             }
             // DON'T clear canvas during reveal
           } else if (nextPhase == 'interval') {
@@ -2369,29 +2208,10 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             _whosNextVideoController?.pause();
           }
         });
-        // Start local phase countdown from phaseEndTime (server no longer sends time_update every second)
-        if (phaseEndTimeMs != null && (phaseEndTimeMs is int || phaseEndTimeMs is num) && mounted) {
-          final endMs = (phaseEndTimeMs as num).toInt();
-          _phaseCountdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-            if (!mounted) return;
-            final now = DateTime.now().millisecondsSinceEpoch;
-            final rem = ((endMs - now) / 1000).ceil().clamp(0, _phaseMaxTime);
-            setState(() {
-              _phaseTimeRemaining = rem;
-            });
-            if (rem <= 0) {
-              _phaseCountdownTimer?.cancel();
-              _phaseCountdownTimer = null;
-              _stopProgressSmoothTimer();
-            }
-          });
-          _startProgressSmoothTimer(endMs);
-        }
         _showDrawerInfo = false;
-        NativeLogService.log(
+        developer.log(
             'Phase changed to $nextPhase. Board size preserved: $_drawerBoardSize',
-            tag: _logTag,
-            level: 'debug'
+            name: _logTag,
           );
         if (nextPhase != 'choosing_word') {
           _cancelWordSelectionCountdown();
@@ -2464,10 +2284,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                   }
                   _lastKnownBoardSize = capturedSize;
                 });
-                NativeLogService.log(
+                developer.log(
                     'Board size recaptured after drawer selection: $capturedSize',
-                    tag: _logTag,
-                    level: 'debug'
+                    name: _logTag,
                   );
               }
             }
@@ -2487,11 +2306,10 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     });
     _socketService.onWordOptions((data) {
       if (!mounted) return;
-      // Show word selection when we receive word_options (server sends only to drawer's current socket).
-      // Do not require _amIDrawer here so drawer gets dialog even when word_options arrive before phase_change.
       final List<String> options =
           List<String>.from(data['words'] ?? const <String>[]);
       if (options.isEmpty) return;
+      // Server only sends word_options to the drawer; treat receipt as being the drawer
       final int duration = (data['duration'] is int && data['duration'] > 0)
           ? data['duration'] as int
           : 10;
@@ -2510,8 +2328,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           : 'Player';
 
       setState(() {
-        // Advance phase so UI does not stay stuck on choosing_word (e.g. drawer had no socket).
-        _currentPhase = 'selecting_drawer';
         if (skipped is Map<String, dynamic> &&
             skipped['id'] == _currentUser?.id) {
           _isDrawer = false;
@@ -2542,24 +2358,50 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     });
 
     _socketService.onTimeUpdate((data) {
-      if (!mounted) return;
-      // When we have a local countdown from phaseEndTime, ignore server remaining so we stay in sync.
-      if (_phaseCountdownTimer != null) return;
-
-
-      final int rawRemaining = (data['remainingTime'] is int)
+      if (mounted) {
+        _phaseTimeRemaining = data['remainingTime'] ?? 0;
+        final int rawRemaining = (data['remainingTime'] is int)
           ? (data['remainingTime'] as int)
           : (data['remainingTime'] as num?)?.round() ?? 0;
 
-      final int clampedRemaining = _phaseMaxTime > 0
-          ? math.max(0, math.min(rawRemaining, _phaseMaxTime))
-          : math.max(0, rawRemaining);
+        final int clampedRemaining = _phaseMaxTime > 0
+            ? math.max(0, math.min(rawRemaining, _phaseMaxTime))
+            : math.max(0, rawRemaining);
 
-      if (clampedRemaining == _phaseTimeRemaining) return;
+        // // #region agent log
+        // developer.log(
+        //   'timeUpdate [H2/run1]', // The event name and logic tags
+        //   name: 'game_room_screen.dart:onTimeUpdate',
+        //   error: const JsonEncoder.withIndent('  ').convert({
+        //     'phase': _currentPhase,
+        //     'phaseMaxTime': _phaseMaxTime,
+        //     'rawRemaining': rawRemaining,
+        //     'clampedRemaining': clampedRemaining,
+        //     'previousPhaseTimeRemaining': _phaseTimeRemaining,
+        //   }),
+        // );
+        // // #endregion
+        // #region agent log
+        print('--- AGENT LOG: onTimeUpdate [H2/run1] ---');
+        print('Source: game_room_screen.dart');
+        print(const JsonEncoder.withIndent('  ').convert({
+          'phase': _currentPhase,
+          'phaseMaxTime': _phaseMaxTime,
+          'rawRemaining': rawRemaining,
+          'clampedRemaining': clampedRemaining,
+          'previousPhaseTimeRemaining': _phaseTimeRemaining,
+        }));
+        print('---------------------------------------');
+        // #endregion
 
-      setState(() {
-        _phaseTimeRemaining = clampedRemaining;
-      });
+        setState(() {
+          _phaseTimeRemaining = data['remainingTime'] ?? 0;
+          if (_phaseMaxTime > 0) {
+            final double progress = _phaseTimeRemaining / _phaseMaxTime;
+            _updateProgressAnimation(progress);
+          }
+        });
+      }
     });
 
     _socketService.onClearChat((data) {
@@ -2623,7 +2465,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         _stopAllPhaseMedia();
         setState(() {
           _isGameEnded = true;
-          _isPostGameTransition = true;
           _wasDrawerWhenGameEnded = _isDrawer;
           _lastRoundGuessedCount = _usersWhoAnswered.length;
           _lastRoundTotalGuessers = _participants.length > 1 ? _participants.length - 1 : 0;
@@ -2662,7 +2503,12 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           attempts++;
         }
         if (mounted && _socketService.socket?.connected == true) {
-          _joinRoomIfNotRecent();
+          _socketService.joinRoom(
+            widget.roomId,
+            team: widget.selectedTeam != null && selectedGameMode == 'team_vs_team'
+                ? widget.selectedTeam
+                : null,
+          );
         }
       } catch (_) {}
       if (mounted) setState(() => _isReconnecting = false);
@@ -2675,7 +2521,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       if (_isGameEnded) return; // Stay on game-end screen; lobby transition happens after ad/leaderboard
       setState(() {
         _isGameEnded = false;
-        _isPostGameTransition = false;
         _isLeaderboardVisible = false;
         if (_room != null) _room!.status = 'lobby';
         _waitingForPlayers = true;
@@ -2919,20 +2764,16 @@ class _GameRoomScreenState extends State<GameRoomScreen>
 
     _socketService.onRequestCanvasData((data) async {
       ///  {roomCode: room.code,
-      ///  targetSocketId: resumingSocketId, targetUserId?: userId }
+      ///  targetSocketId: resumingSocketId }
       
       final canvasData = data as Map<String, dynamic>;
       final roomCode = canvasData['roomCode'];
       final targetSocketId = canvasData['targetSocketId'];
-      final targetUserId = canvasData['targetUserId']; // server sends so canvas_resume goes to current socket after reconnect
-      // lastSequence: resuming client ignores drawing_data with seq <= this (snapshot covers up to this)
       _socketService.sendCanvasData(
           roomCode,
           targetSocketId,
           _strokes.value.map((e) => e.toJson()).toList(),
-          (_phaseTimeRemaining).toDouble(),
-          lastSequence: _strokeSequenceNumber,
-          targetUserId: targetUserId);
+          (_phaseTimeRemaining).toDouble());
     });
 
     _socketService.onCanvasDataReceived((data) async {
@@ -2941,56 +2782,18 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       final List<fdb.Stroke> history = historyData
           .map((e) => fdb.Stroke.fromJson(Map<String, dynamic>.from(e)))
           .toList();
-      // Snapshot versioning: ignore drawing_data with sequence <= this until next phase
-      final int lastSeq = (canvasData['lastSequence'] is int)
-          ? canvasData['lastSequence'] as int
-          : ((canvasData['lastSequence'] as num?)?.toInt() ?? -1);
       _room = RoomModel.fromJson(Map<String, dynamic>.from(data['room']));
       _currentPhase = _room?.roundPhase;
-      // Set remaining from room.roundPhaseEndTime (end - now) so we stay in sync; fallback to canvasData['remainingTime'].
-      if (_room?.roundPhaseEndTime != null) {
-        final ms = _room!.roundPhaseEndTime!.millisecondsSinceEpoch -
-            DateTime.now().millisecondsSinceEpoch;
-        _phaseTimeRemaining = math.max(0, (ms / 1000).ceil());
-      } else {
-        _phaseTimeRemaining = canvasData['remainingTime'] is int
-            ? canvasData['remainingTime'] as int
-            : (canvasData['remainingTime'] as num?)?.round() ?? 0;
-      }
+      _phaseTimeRemaining = canvasData['remainingTime'] is int
+          ? canvasData['remainingTime'] as int
+          : (canvasData['remainingTime'] as num?)?.round() ?? 0;
       if (mounted) {
-        // Start local phase countdown from room.roundPhaseEndTime so timer stays in sync.
-        if (_room?.roundPhaseEndTime != null) {
-          _phaseCountdownTimer?.cancel();
-          _phaseCountdownTimer = null;
-          final endMs = _room!.roundPhaseEndTime!.millisecondsSinceEpoch;
-          _phaseCountdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-            if (!mounted) return;
-            final now = DateTime.now().millisecondsSinceEpoch;
-            final rem = ((endMs - now) / 1000).ceil().clamp(0, _phaseMaxTime);
-            setState(() {
-              _phaseTimeRemaining = rem;
-            });
-            if (rem <= 0) {
-              _phaseCountdownTimer?.cancel();
-              _phaseCountdownTimer = null;
-              _stopProgressSmoothTimer();
-            }
-          });
-          _startProgressSmoothTimer(endMs);
-        }
         _strokes.value = history;
-
-        _lastSequenceFromSnapshot = lastSeq >= 0 ? lastSeq : -1;
-        // Tell server resync is done so we receive live drawing_data again
-        _socketService.emitResyncDone();
-        if (_room?.roundPhaseEndTime == null && _phaseMaxTime > 0) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted || _phaseMaxTime <= 0) return;
-            final progress = (_phaseTimeRemaining / _phaseMaxTime).clamp(0.0, 1.0);
-            _updateProgressAnimation(progress, immediate: true);
-          });
-        }
-
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _phaseMaxTime <= 0) return;
+          final progress = (_phaseTimeRemaining / _phaseMaxTime).clamp(0.0, 1.0);
+          _updateProgressAnimation(progress);
+        });
       }
     });
     _socketService.onCanvasClear((data) {
@@ -3011,10 +2814,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         // Restore the board size immediately after setState
         _drawerBoardSize = savedSize;
 
-        NativeLogService.log(
+        developer.log(
           "Canvas cleared (guesser), version updated to: $_canvasVersion",
-          tag: _logTag,
-          level: 'debug'
+          name: _logTag,
         );
 
         // If size was lost (Size.zero), try to recapture it
@@ -3028,10 +2830,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                   activeKey.currentContext?.findRenderObject() as RenderBox?;
               if (renderBox != null && renderBox.hasSize) {
                 _drawerBoardSize = renderBox.size;
-                NativeLogService.log(
+                developer.log(
                     'Board size recaptured after clear: $_drawerBoardSize',
-                    tag: _logTag,
-                    level: 'debug'
+                    name: _logTag,
                   );
               }
             }
@@ -3073,10 +2874,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         // If game has ended and we're showing ad/leaderboard, don't exit immediately
         // Let the ad/leaderboard flow complete first
         if (_isGameEnded) {
-          NativeLogService.log(
+          developer.log(
             "Room closed but game ended - will exit after ad/leaderboard",
-            tag: _logTag,
-            level: 'debug'
+            name: _logTag,
           );
           // Set a flag to exit after ad is shown
           _shouldExitAfterAd = true;
@@ -3115,10 +2915,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         // Suppress "room_not_found" errors during resume - they're often false positives
         // The room exists, but there might be a timing issue with socket reconnection
         if (_isResuming && message == 'room_not_found') {
-          NativeLogService.log(
+          developer.log(
             "Suppressing room_not_found error during resume - room should exist",
-            tag: _logTag,
-            level: 'debug'
+            name: _logTag,
           );
           return;
         }
@@ -3175,9 +2974,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           case 'you_are_banned':
             errorMessage = 'You are banned from this room.';
             break;
-          case 'room_not_found':
-            errorMessage = 'Room no longer exists. Leaving.';
-            break;
           default:
             errorMessage = 'Error: $message';
         }
@@ -3193,12 +2989,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           if (message == 'you_were_replaced' && mounted) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) context.go('/home');
-            });
-          }
-          // Room no longer exists (e.g. deleted before start): leave and go home
-          if (message == 'room_not_found' && !_isResuming && mounted) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) _leaveRoom();
             });
           }
         }
@@ -3304,7 +3094,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   void _clearCanvas() {
-    if (_connectionState != GameConnectionState.ready) return;
     // Increment canvas version when clearing to prevent race conditions
     _canvasVersion++;
     
@@ -3315,10 +3104,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     _drawerBoardSize = savedSize;
     _lastKnownBoardSize = savedSize;
     _socketService.clearCanvas(widget.roomId, _canvasVersion);
-    NativeLogService.log(
+    developer.log(
       "Canvas cleared by drawer, version: $_canvasVersion",
-      tag: _logTag,
-      level: 'debug'
+      name: _logTag,
     );
   }
 
@@ -3336,7 +3124,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   void _sendAnswer() {
-    if (_connectionState != GameConnectionState.ready) return;
     final answer = _answerController.text.trim();
     if (answer.isEmpty || _isDrawer) return;
 
@@ -3365,7 +3152,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   void _sendChatMessage() {
-    if (_connectionState != GameConnectionState.ready) return;
     final message = _chatController.text.trim();
     if (message.isEmpty) return;
     _socketService.sendMessage(widget.roomId, message,
@@ -3374,7 +3160,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   void _startGame() async {
-    if (_connectionState != GameConnectionState.ready) return;
     // Start the game - backend will deduct coins from all players
     _socketService.startGame(widget.roomId);
 
@@ -3386,7 +3171,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   void _leaveRoom() async {
-    _markLeftCurrentRoom();
     await _roomRepository.leaveRoom(roomId: widget.roomId);
     _socketService.leaveRoom(widget.roomId);
     _socketService.removeAllListeners();
@@ -3414,7 +3198,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   void _undo() {
-    if (_connectionState != GameConnectionState.ready) return;
     if (_undoRedoStack.canUndo.value) {
       _undoRedoStack.undo();
       _socketService.clearCanvas(widget.roomId);
@@ -3425,7 +3208,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   void _redo() {
-    if (_connectionState != GameConnectionState.ready) return;
     if (_undoRedoStack.canRedo.value) {
       _undoRedoStack.redo();
       _socketService.clearCanvas(widget.roomId);
@@ -3465,7 +3247,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   Widget _showWordSelectionDialog() {
-    if (!_amIDrawer) return const SizedBox.shrink();
     if (_wordOptions == null || _wordOptions!.isEmpty) return const SizedBox.shrink();
     return Container(
       width: double.infinity,
@@ -3522,7 +3303,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           ),
         ),
         onPressed: () {
-          if (_connectionState != GameConnectionState.ready) return;
           _cancelWordSelectionCountdown();
           _socketService.chooseWord(widget.roomId, _wordOptions![index]);
 
@@ -3898,18 +3678,16 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     if (_closeRewardedAd != null && _adLoadTime != null) {
       final hoursSinceLoad = DateTime.now().difference(_adLoadTime!).inHours;
       if (hoursSinceLoad < 1) {
-        NativeLogService.log(
+        developer.log(
           "Ad already loaded and fresh (loaded ${hoursSinceLoad}h ago)",
-          tag: _logTag,
-          level: 'debug'
+          name: _logTag,
         );
         return;
       } else {
         // Ad is too old, dispose it and load a new one
-        NativeLogService.log(
+        developer.log(
           "Ad is too old (${hoursSinceLoad}h), disposing and reloading",
-          tag: _logTag,
-          level: 'debug'
+          name: _logTag,
         );
         _closeRewardedAd?.dispose();
         _closeRewardedAd = null;
@@ -3930,18 +3708,16 @@ class _GameRoomScreenState extends State<GameRoomScreen>
               _adLoadTime = DateTime.now(); // Store load time
               _isLoadingCloseAd = false;
             });
-            NativeLogService.log(
+            developer.log(
               "Rewarded ad loaded and stored successfully",
-              tag: _logTag,
-              level: 'debug'
+              name: _logTag,
             );
           }
         },
         onAdFailedToLoad: (error) {
-          NativeLogService.log(
+          developer.log(
             "Failed to load close rewarded ad: $error",
-            tag: _logTag,
-            level: 'error'
+            name: _logTag,
           );
           if (mounted) {
             setState(() {
@@ -3951,10 +3727,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         },
       );
     } catch (e) {
-      NativeLogService.log(
+      developer.log(
         "Error loading close rewarded ad: $e",
-        tag: _logTag,
-        level: 'error'
+        name: _logTag,
       );
       if (mounted) {
         setState(() {
@@ -4012,10 +3787,17 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     
     // Helper function to return to lobby screen (where categories are selected and start button is clicked)
     void returnToLobby() {
+      // #region agent log
+      _debugLobbyLog('game_room_screen:returnToLobby', 'entry', {
+        'mounted': mounted,
+        'roomNotNull': _room != null,
+        'roomStatusBefore': _room?.status,
+        'waitingForPlayersBefore': _waitingForPlayers,
+      }, 'H2');
+      // #endregion
       if (!mounted) return;
       setState(() {
         _isGameEnded = false;
-        _isPostGameTransition = false;
         _isLeaderboardVisible = false;
         if (_room != null) {
           _room!.status = 'lobby';
@@ -4023,6 +3805,12 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         _waitingForPlayers = true;
         _isWaitingForHostOrMembers = true;
       });
+      // #region agent log
+      _debugLobbyLog('game_room_screen:returnToLobby', 'after setState', {
+        'roomStatusAfter': _room?.status,
+        'waitingForPlayersAfter': _waitingForPlayers,
+      }, 'H2');
+      // #endregion
       _resetGameState();
       Future.delayed(const Duration(milliseconds: 500), () {
         if (mounted && _areHostOrMembersReady()) {
@@ -4038,8 +3826,19 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     /// Safely navigate to lobby: try returnToLobby(), then re-join and refetch so user appears in lobby list and state is like initial lobby (same room code).
     void _safeGoToLobbyAfterAd() {
       final rid = widget.roomId;
+      // #region agent log
+      _debugLobbyLog('game_room_screen:_safeGoToLobbyAfterAd', 'entry', {
+        'mounted': mounted,
+        'routerNotNull': router != null,
+        'roomId': rid,
+        'roomIdNotEmpty': rid.isNotEmpty,
+      }, 'H1');
+      // #endregion
       try {
         if (mounted) {
+          // #region agent log
+          _debugLobbyLog('game_room_screen:_safeGoToLobbyAfterAd', 'calling returnToLobby', {}, 'H1');
+          // #endregion
           returnToLobby();
           // Re-join room so server re-broadcasts room_participants (user appears in lobby list for others) and we get room_joined with full room.
           String? team;
@@ -4066,10 +3865,16 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             );
           });
         } else if (router != null && rid.isNotEmpty) {
+          // #region agent log
+          _debugLobbyLog('game_room_screen:_safeGoToLobbyAfterAd', 'mounted false, using router.go', {'roomId': rid}, 'H1');
+          // #endregion
           router!.go('/game-room/$rid');
         }
       } catch (e) {
-        NativeLogService.log('returnToLobby failed after ad: $e', tag: _logTag, level: 'error');
+        // #region agent log
+        _debugLobbyLog('game_room_screen:_safeGoToLobbyAfterAd', 'catch', {'error': e.toString()}, 'H3');
+        // #endregion
+        developer.log('returnToLobby failed after ad: $e', name: _logTag);
         if (router != null && rid.isNotEmpty) {
           router!.go('/game-room/$rid');
         }
@@ -4132,10 +3937,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         try {
           Navigator.of(context, rootNavigator: true).pop(); // Close the loading dialog
         } catch (e) {
-          NativeLogService.log(
+          developer.log(
             "Error dismissing loading dialog: $e",
-            tag: _logTag,
-            level: 'error'
+            name: _logTag,
           );
         }
       }
@@ -4174,6 +3978,12 @@ class _GameRoomScreenState extends State<GameRoomScreen>
           _isShowingAd = false;
           dismissedAd.dispose();
           _preloadNextAd();
+          // #region agent log
+          _debugLobbyLog('game_room_screen:onAdDismissed', 'callback', {
+            'mounted': mounted,
+            'goToLobbyAfterAd': goToLobbyAfterAd,
+          }, 'H1');
+          // #endregion
           if (mounted) {
             if (snackbarThenGoHome != null && snackbarThenGoHome.isNotEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -4208,10 +4018,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         },
         onAdFailedToShowFullScreenContent: (failedAd, error) {
           _isShowingAd = false;
-          NativeLogService.log(
+          developer.log(
             "Ad failed to show: $error",
-            tag: _logTag,
-            level: 'error'
+            name: _logTag,
           );
           failedAd.dispose();
           _preloadNextAd();
@@ -4256,10 +4065,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       }
     } catch (e) {
       _isShowingAd = false;
-      NativeLogService.log(
+      developer.log(
         "Error showing close rewarded ad: $e",
-        tag: _logTag,
-        level: 'error'
+        name: _logTag,
       );
       _preloadNextAd();
       if (mounted) {
@@ -4407,6 +4215,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _progressAnimationController.dispose();
     _pointsAnimationController.dispose();
     _answerController.dispose();
     _chatController.dispose();
@@ -4418,8 +4227,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     _nextDrawerTimer?.cancel();
     _wordSelectionTimer?.cancel();
     _teamScoreboardTimer?.cancel();
-    _phaseCountdownTimer?.cancel();
-    _stopProgressSmoothTimer();
     _speakingCleanupTimer?.cancel(); // Add this line
     
     // Cleanup retry timers
@@ -4441,7 +4248,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     _lostTurnVideoController?.pause();
     _lostTurnVideoController?.dispose();
 
-    _markLeftCurrentRoom();
     _socketService.leaveRoom(widget.roomId);
     _socketService.removeAllListeners();
     // _voiceService.cleanUp();
@@ -4613,14 +4419,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                   ),
                 ),
               ),
-            if (_isPostGameTransition)
-              Container(
-                key: const ValueKey('post_game_transition_overlay'),
-                color: Colors.black54,
-                child: const Center(
-                  child: CircularProgressIndicator(color: Colors.cyan),
-                ),
-              ),
           ],
         );
       });
@@ -4631,9 +4429,8 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   Widget _buildGameScreen() {
     final bool isKeyboardVisible = MediaQuery.of(context).viewInsets.bottom > 0;
 
-    // If drawer, show fullscreen drawing board (role guard: only when myId == drawerId and we've been marked drawer e.g. by word_options)
-    if (_amIDrawer &&
-        _isDrawer &&
+    // If drawer, show fullscreen drawing board
+    if (_isDrawer &&
         !_waitingForPlayers &&
         _room?.status == 'playing' &&
         _currentWord != null) {
@@ -4681,38 +4478,18 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     );
   }
 
-  /// Updates the progress bar value. Stops the smooth timer so this static value is shown.
-  /// When we have phase end time, the smooth timer drives _progressValue every 100ms instead.
-  void _updateProgressAnimation(double targetProgress, {bool immediate = false}) {
+  void _updateProgressAnimation(double targetProgress) {
     final double clampedProgress = targetProgress.clamp(0.0, 1.0);
-    _stopProgressSmoothTimer();
-    _progressValue.value = clampedProgress;
-  }
-
-  void _startProgressSmoothTimer(int endMs) {
-    _phaseEndTimeMs = endMs;
-    _progressSmoothTimer?.cancel();
-    if (_phaseMaxTime <= 0) return;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    _progressValue.value = ((endMs - now) / 1000.0 / _phaseMaxTime).clamp(0.0, 1.0);
-    _progressSmoothTimer = Timer.periodic(_progressSmoothInterval, (_) {
-      if (!mounted) return;
-      final now = DateTime.now().millisecondsSinceEpoch;
-      if (_phaseMaxTime <= 0) return;
-      final progress = ((endMs - now) / 1000.0 / _phaseMaxTime).clamp(0.0, 1.0);
-      _progressValue.value = progress;
-      if (progress <= 0) {
-        _progressSmoothTimer?.cancel();
-        _progressSmoothTimer = null;
-        _phaseEndTimeMs = null;
-      }
-    });
-  }
-
-  void _stopProgressSmoothTimer() {
-    _progressSmoothTimer?.cancel();
-    _progressSmoothTimer = null;
-    _phaseEndTimeMs = null;
+    _progressAnimation = Tween<double>(
+      begin: _progressAnimation.value,
+      end: clampedProgress,
+    ).animate(
+      CurvedAnimation(
+        parent: _progressAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+    _progressAnimationController.forward(from: 0.0);
   }
 
   Widget _buildExpandedDrawingScreen() {
@@ -4728,14 +4505,14 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     final double progress = isDrawingPhase && _phaseMaxTime > 0
         ? remainingSeconds / _phaseMaxTime
         : 0.0;
-    final bool isCritical = isDrawingPhase && remainingSeconds > 0 && remainingSeconds < 20;
+    final bool isCritical = isDrawingPhase && remainingSeconds < 20;
 
-    // Update progress from build only when smooth timer is not running (smooth timer drives bar every 100ms)
-    if (_phaseEndTimeMs == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _updateProgressAnimation(progress);
-      });
-    }
+    // Update animation smoothly when progress changes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _updateProgressAnimation(progress);
+      }
+    });
 
     final String expandedKeyString =
         'expanded_${_currentPhase ?? 'unknown'}_${_isDrawer ? 'drawer' : 'guesser'}';
@@ -4763,14 +4540,15 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                         width: 1,
                       ),
                     ),
-                    child: ListenableBuilder(
-                      listenable: _progressValue,
+                    child: AnimatedBuilder(
+                      animation: _progressAnimation,
                       builder: (context, child) {
-                        final p = _progressValue.value.clamp(0.0, 1.0);
                         return CustomPaint(
-                          foregroundPainter: isDrawingPhase && p > 0
+                          foregroundPainter: isDrawingPhase &&
+                                  _progressAnimation.value > 0
                               ? _PhaseBorderPainter(
-                                  progress: p,
+                                  progress:
+                                      _progressAnimation.value.clamp(0.0, 1.0),
                                   color: isCritical
                                       ? Colors.redAccent
                                       : const Color(0xFF3EE07F),
@@ -4825,7 +4603,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                   onDrawingStrokeChanged: (stroke) {
                                     // helper function with proper sequence handling and normalization
                                     void _sendDrawingData(fdb.Stroke strokeToSend, bool isFinished, {int? sequenceOverride, int retryCount = 0}) {
-                                      if (_connectionState != GameConnectionState.ready) return;
                                       // Only increment sequence on first send, not on retries
                                       final sequence = sequenceOverride ?? (++_strokeSequenceNumber);
                                       
@@ -4872,18 +4649,16 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                       _retryTimers[sequence] = Timer(Duration(milliseconds: _ackTimeoutMs), () {
                                         if (_pendingStrokes.containsKey(sequence) && retryCount < _maxRetries) {
                                           // Retry with SAME sequence number
-                                          NativeLogService.log(
+                                          developer.log(
                                             "Retrying drawing packet seq: $sequence (attempt ${retryCount + 1}/$_maxRetries)",
-                                            tag: _logTag,
-                                            level: 'debug'
+                                            name: _logTag,
                                           );
                                           _sendDrawingData(strokeToSend, isFinished, sequenceOverride: sequence, retryCount: retryCount + 1);
                                         } else if (_pendingStrokes.containsKey(sequence)) {
                                           // Max retries reached
-                                          NativeLogService.log(
+                                          developer.log(
                                             "Failed to send drawing packet seq: $sequence after $_maxRetries retries",
-                                            tag: _logTag,
-                                            level: 'debug'
+                                            name: _logTag,
                                           );
                                           _pendingStrokes.remove(sequence);
                                           _retryTimers.remove(sequence);
@@ -4992,13 +4767,11 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                 !_shouldShowNextDrawerOverlay )
               _buildLeaderboardOverlay(),
 
-            if (_amIDrawer && _isDrawer) ...[
-              _buildOptionIcon(),
-              _buildDrawingTools(),
-            ],
+            _buildOptionIcon(),
+            _buildDrawingTools(),
 
-            // Show chosen word for drawer at bottom left (role guard: only when myId == drawerId)
-            if (_amIDrawer && _currentWord != null && _currentPhase == 'drawing')
+            // Show chosen word for drawer at bottom left
+            if (_isDrawer && _currentWord != null && _currentPhase == 'drawing')
               Positioned(
                 bottom: 80.h,
                 left: 16.w,
@@ -5869,197 +5642,166 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                 padding: EdgeInsets.symmetric(horizontal: 12.w),
                 child: Column(
                   children: [
-                    // Settings dropdowns - Same layout as multiplayer: Rows with Expanded, equal width, consistent padding
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: isTablet ? 12.0 : 4.w),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Row 1: Language + Script (or placeholder)
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildLobbyFilterPill(
-                                  hint: 'Word Theme',
-                                  value: selectedLanguage,
-                                  items: languages,
-                                  icon: Icons.language,
-                                  iconColor: Colors.lightBlueAccent,
-                                  isTablet: isTablet,
-                                  onChanged: isOwner
-                                      ? (v) {
-                                          setState(() {
-                                            selectedLanguage = v;
-                                            if (_isEnglishLanguage(v)) {
-                                              selectedScript = 'english';
-                                            } else {
-                                              if (selectedScript == null ||
-                                                  selectedScript == 'english') {
-                                                selectedScript = 'default';
-                                              }
-                                            }
-                                          });
-                                          _updateSettings();
-                                        }
-                                      : null,
-                                  getDisplayValue: _getLocalizedDisplayValue,
-                                ),
-                              ),
-                              SizedBox(width: isTablet ? 16.0 : 8.w),
-                              Expanded(
-                                child: !_isEnglishLanguage(selectedLanguage)
-                                    ? _buildLobbyFilterPill(
-                                        hint: 'Default',
-                                        value: selectedScript,
-                                        items: scripts,
-                                        icon: Icons.text_fields,
-                                        iconColor: Colors.deepPurpleAccent,
-                                        isTablet: isTablet,
-                                        onChanged: isOwner
-                                            ? (v) {
-                                                setState(() =>
-                                                    selectedScript = v);
-                                                _updateSettings();
-                                              }
-                                            : null,
-                                        getDisplayValue: _getLocalizedDisplayValue,
-                                      )
-                                    : _buildLobbyFilterPill(
-                                        hint: 'Word Script',
-                                        value: 'Default',
-                                        items: const <String>[
-                                          'Word Script: English (auto)'
-                                        ],
-                                        icon: Icons.text_fields,
-                                        iconColor: Colors.deepPurpleAccent,
-                                        isTablet: isTablet,
-                                        onChanged: null,
-                                        getDisplayValue: _getLocalizedDisplayValue,
-                                      ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: isTablet ? 16.0 : 10.h),
-                          // Row 2: Country + Points
-                          Row(
-                            children: [
-                              Expanded(
-                                child: IgnorePointer(
-                                  ignoring: !isOwner,
-                                  child: CountryPickerWidget(
-                                    selectedCountryCode: selectedCountry,
-                                    onCountrySelected: isOwner
-                                        ? (countryCode) {
-                                            setState(() =>
-                                                selectedCountry = countryCode);
-                                            _updateSettings();
+                    // Settings dropdowns - Flexible to take available space
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final double controlWidth =
+                            (constraints.maxWidth - 10.w) / 2;
+                        return Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 10.w,
+                          runSpacing: 10.w,
+                          children: [
+                            _buildGradientDropdown(
+                              width: controlWidth,
+                              hint: 'Word Theme',
+                              value: selectedLanguage,
+                              items: languages,
+                              icon: Icons.language,
+                              isTablet: isTablet,
+                              onChanged: isOwner
+                                  ? (v) {
+                                      setState(() {
+                                        selectedLanguage = v;
+                                        // Apply word_script logic: If language is English, auto-set script to 'english'
+                                        if (_isEnglishLanguage(v)) {
+                                          selectedScript = 'english';
+                                        } else {
+                                          // For non-English languages, default to 'default' if not already set or if switching from English
+                                          if (selectedScript == null ||
+                                              selectedScript == 'english') {
+                                            selectedScript = 'default';
                                           }
-                                        : (_) {},
-                                    hintText: 'Country',
-                                    icon: Icons.flag,
-                                    height: isTablet ? 65.0 : 45.h,
-                                    iconColor: Colors.lightGreenAccent,
-                                    isTablet: isTablet,
-                                  ),
-                                ),
+                                        }
+                                      });
+                                      _updateSettings();
+                                    }
+                                  : null,
+                            ),
+                            // Hide script dropdown if language is English (word_script must be 'english')
+                            if (!_isEnglishLanguage(selectedLanguage))
+                              _buildGradientDropdown(
+                                width: controlWidth,
+                                hint: 'Default',
+                                value: selectedScript,
+                                items: scripts,
+                                icon: Icons.text_fields,
+                                isTablet: isTablet,
+                                onChanged: isOwner
+                                    ? (v) {
+                                        setState(() => selectedScript = v);
+                                        _updateSettings();
+                                      }
+                                    : null,
                               ),
-                              SizedBox(width: isTablet ? 16.0 : 8.w),
-                              Expanded(
-                                child: _buildLobbyFilterPill(
-                                  hint: 'Points',
-                                  value: (selectedPoints ?? 100).toString(),
-                                  items: pointsOptions
-                                      .map((e) => e.toString())
-                                      .toList(),
-                                  icon: Icons.star,
-                                  iconColor: Colors.amber,
-                                  isTablet: isTablet,
-                                  onChanged: isOwner
-                                      ? (v) {
-                                          setState(() => selectedPoints =
-                                              int.tryParse(v ?? '100'));
+                            // Show placeholder when language is English
+                            if (_isEnglishLanguage(selectedLanguage))
+                              _buildGradientDropdown(
+                                width: controlWidth,
+                                hint: 'Word Script',
+                                value: 'Default',
+                                items: const <String>[
+                                  'Word Script: English (auto)'
+                                ],
+                                icon: Icons.text_fields,
+                                isTablet: isTablet,
+                                onChanged: null,
+                              ),
+                            SizedBox(
+                              width: controlWidth,
+                              child: IgnorePointer(
+                                ignoring: !isOwner, // Only host can change country
+                                child: CountryPickerWidget(
+                                  selectedCountryCode: selectedCountry,
+                                  onCountrySelected: isOwner
+                                      ? (countryCode) {
+                                          setState(() => selectedCountry = countryCode);
                                           _updateSettings();
                                         }
-                                      : null,
-                                  getDisplayValue: _getLocalizedDisplayValue,
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: isTablet ? 16.0 : 10.h),
-                          // Row 3: Category + Game Mode
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildLobbyCategoryPill(
-                                  hint: 'Category',
-                                  selectedValues: selectedCategories,
-                                  items: categories,
-                                  icon: Icons.category,
-                                  iconColor: Colors.orange,
-                                  isTablet: isTablet,
-                                  onChanged: isOwner
-                                      ? (v) {
-                                          setState(() =>
-                                              selectedCategories = v);
-                                          _updateSettings();
-                                        }
-                                      : null,
-                                  getDisplayValue: _getLocalizedDisplayValue,
-                                ),
-                              ),
-                              SizedBox(width: isTablet ? 16.0 : 8.w),
-                              Expanded(
-                                child: _buildLobbyGameModePill(
-                                  isOwner: isOwner,
+                                      : (_) {},
+                                  hintText: 'Country',
+                                  icon: Icons.flag,
                                   isTablet: isTablet,
                                 ),
                               ),
-                            ],
-                          ),
-                          SizedBox(height: isTablet ? 16.0 : 10.h),
-                          // Row 4: Public only (centered, constrained width)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              SizedBox(
-                                width: isTablet ? 300.0 : 200.w, // Approximate width to match other fields
-                                child: _buildPublicFieldUniform(
-                                    isTablet: isTablet, isOwner: isOwner),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: isTablet ? 16.0 : 10.h),
-                          // Row 5: Room Code | Player Count | Color selector (three items, same height/style)
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildRoomCodeField(isTablet: isTablet),
-                              ),
-                              SizedBox(width: isTablet ? 16.0 : 8.w),
-                              Expanded(
-                                child: _buildPlayerCountField(
-                                    isOwner: isOwner, isTablet: isTablet),
-                              ),
-                              SizedBox(width: isTablet ? 16.0 : 8.w),
-                              Expanded(
-                                child: _buildColorSelectorField(
-                                    isOwner: isOwner, isTablet: isTablet),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                            ),
+                            _buildGradientDropdown(
+                              width: controlWidth,
+                              hint: 'Points',
+                              value: (selectedPoints ?? 100).toString(),
+                              items: pointsOptions
+                                  .map((e) => e.toString())
+                                  .toList(),
+                              icon: Icons.stars,
+                              isTablet: isTablet,
+                              onChanged: isOwner
+                                  ? (v) {
+                                      setState(() => selectedPoints =
+                                          int.tryParse(v ?? '100'));
+                                      _updateSettings();
+                                    }
+                                  : null,
+                            ),
+                            _buildMultiSelectCategoryDropdown(
+                              width: controlWidth,
+                              hint: 'Category',
+                              selectedValues: selectedCategories,
+                              items: categories,
+                              icon: Icons.category,
+                              isTablet: isTablet,
+                              onChanged: isOwner
+                                  ? (v) {
+                                      setState(() => selectedCategories = v);
+                                      _updateSettings();
+                                    }
+                                  : null,
+                            ),
+                            _buildGameModeGradientDropdown(
+                              width: controlWidth,
+                              isOwner: isOwner,
+                              isTablet: isTablet,
+                            ),
+                            // _buildCheckboxField(
+                            //   width: controlWidth,
+                            //   title: 'Voice',
+                            //   value: voiceEnabled,
+                            //   onChanged: isOwner
+                            //       ? (v) {
+                            //           (voiceEnabled = v ?? false);
+                            //           _updateSettings();
+                            //         }
+                            //       : null,
+                            // ),
+                            _buildToggleField(
+                              width: controlWidth,
+                              title: 'Public',
+                              value: isPublic,
+                              isTablet: isTablet,
+                              onChanged: isOwner
+                                  ? (v) {
+                                      setState(() => isPublic = v);
+                                      _updateSettings();
+                                    }
+                                  : (_) {},
+                            ),
+                          ],
+                        );
+                      },
                     ),
+                    // ),
 
-                    SizedBox(height: isTablet ? 16.0 : 10.h),
+                    SizedBox(height: 8.h),
 
-                    // Room card (players list) — ensure visible with min height
+                    // Room code, player count, team color select
+                    _buildCreateRoomTopStrip(isOwner),
+
+                    SizedBox(height: 8.h),
+
+                    // Players list panel - Flexible height with scrollable content
+                    // Flexible(
+                    //   flex: 2,
                     Expanded(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(minHeight: 120.h),
-                        child: Container(
+                      child: Container(
                         width: double.infinity,
                         constraints: const BoxConstraints(),
                         decoration: BoxDecoration(
@@ -6494,7 +6236,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                             ),
                       ),
                     ),
-                    ),
 
                     SizedBox(height: 10.h),
 
@@ -6544,7 +6285,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                       ),
                     if (!isOwner) SizedBox(height: 10.h),
 
-                    // Start / Coins button — height: padding vertical; "250" font: fontSize below
+                    // Start / Coins button (UI exact) - only host can start; all must be ready
                     if (isOwner)
                       GestureDetector(
                         onTap: isOwner
@@ -6579,13 +6320,12 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                             : null,
                         child: Container(
                           width: double.infinity,
-                          padding: EdgeInsets.symmetric(
-                              vertical: isTablet ? 12.h : 8.h),
+                          padding: EdgeInsets.symmetric(vertical: 10.h),
                           decoration: BoxDecoration(
                             color: _isLobbyFormComplete()
                                 ? const Color.fromARGB(255, 47, 219, 53)
                                 : Colors.red,
-                            borderRadius: BorderRadius.circular(25.r),
+                            borderRadius: BorderRadius.circular(30.r),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -6594,12 +6334,12 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                 ? Icon(
                                     Icons.rocket_launch,
                                     color: Colors.white,
-                                    size: isTablet ? 24.sp : 20.sp,
+                                    size: isTablet ? 32.sp : 25.h,
                                   )
                                 : Image.asset(
                                     AppImages.gameCoin,
-                                    height: isTablet ? 24.sp : 20.sp,
-                                    width: isTablet ? 24.sp : 20.sp,
+                                    height: isTablet ? 32.sp : 25.h,
+                                    width: isTablet ? 32.sp : 25.h,
                                     fit: BoxFit.contain,
                                   ),
                               SizedBox(width: 8.w),
@@ -6608,15 +6348,15 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                     ? "Let's go! Room is live"
                                     : '${_calculateEntryCost()}',
                                 style: TextStyle(
-                                  fontSize: isTablet ? 18.sp : 14.sp,
+                                  fontSize: isTablet ? 22.sp : 18.sp,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.white,
                                 ),
                               ),
                             ],
                           ),
-                        ),
                       ),
+                    ),
 
                     // Minimal bottom padding before ad
                     SizedBox(height: 4.h),
@@ -6657,310 +6397,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     if (!_areAllParticipantsReady()) return false;
     if (selectedGameMode == 'team_vs_team' && !_hasEnoughPlayersForTeamMode()) return false;
     return true;
-  }
-
-  /// Uniform container for all lobby fields (same height, border, radius, background).
-  Widget _buildUniformFieldContainer({
-    required bool isTablet,
-    required Widget child,
-  }) {
-    final height = isTablet ? 65.0 : 45.h;
-    return Container(
-      height: height,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(25.r),
-        border: Border.all(
-            color: Colors.white, width: isTablet ? 2.0 : 1.w),
-        color: Colors.black.withOpacity(0.35),
-      ),
-      child: child,
-    );
-  }
-
-  Widget _buildRoomCodeField({required bool isTablet}) {
-    final paddingH = isTablet ? 20.0 : 10.w;
-    final paddingV = isTablet ? 12.0 : 10.h;
-    final iconSz = isTablet ? 32.0 : 18.sp;
-    final fontSize = isTablet ? 22.0 : 17.sp;
-    return _buildUniformFieldContainer(
-      isTablet: isTablet,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(25.r),
-          onTap: _copyRoomCode,
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: paddingV),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.tag, color: Colors.white70, size: iconSz),
-                SizedBox(width: isTablet ? 12.0 : 8.w),
-                Expanded(
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 7.w, vertical: 3.h),
-                    decoration: BoxDecoration(
-                      color: AppColors.darkBlue,
-                      borderRadius: BorderRadius.circular(4.r),
-                    ),
-                    child: Center(
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          _room?.code ?? '-----',
-                          style: GoogleFonts.lato(
-                            color: Colors.white,
-                            fontSize: fontSize,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: isTablet ? 10.0 : 6.w),
-                Icon(Icons.copy, color: Colors.white70, size: iconSz),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPublicFieldUniform(
-      {required bool isTablet, required bool isOwner}) {
-    final paddingH = isTablet ? 20.0 : 10.w;
-    final paddingV = isTablet ? 12.0 : 10.h;
-    final iconSz = isTablet ? 32.0 : 18.sp;
-    final fontSize = isTablet ? 22.0 : 13.sp;
-    return _buildUniformFieldContainer(
-      isTablet: isTablet,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: paddingH, vertical: paddingV),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          children: [
-            Icon(
-              isPublic ? Icons.lock_open : Icons.lock,
-              color: isPublic
-                  ? const Color.fromARGB(255, 220, 228, 223)
-                  : Colors.white54,
-              size: iconSz,
-            ),
-            SizedBox(width: isTablet ? 12.0 : 8.w),
-            Expanded(
-              child: Text(
-                'Public',
-                style: GoogleFonts.lato(
-                  color: isPublic ? Colors.white : Colors.white54,
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w600,
-                  height: 1.2,
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-            ),
-            if (isOwner)
-              GestureDetector(
-                onTap: () {
-                  setState(() => isPublic = !isPublic);
-                  _updateSettings();
-                },
-                child: Image.asset(
-                  isPublic
-                      ? AppImages.boxtoggleon
-                      : AppImages.boxtoggleoff,
-                  width: isTablet ? 28.w : 22.w,
-                  height: isTablet ? 32.h : 26.h,
-                  fit: BoxFit.contain,
-                ),
-              )
-            else
-              Image.asset(
-                isPublic
-                    ? AppImages.boxtoggleon
-                    : AppImages.boxtoggleoff,
-                width: isTablet ? 28.w : 22.w,
-                height: isTablet ? 32.h : 26.h,
-                fit: BoxFit.contain,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlayerCountField(
-      {required bool isOwner, required bool isTablet}) {
-    final paddingH = isTablet ? 20.0 : 10.w;
-    final iconSz = isTablet ? 32.0 : 18.sp;
-    final fontSize = isTablet ? 22.0 : 13.sp;
-    final minPlayers = _participants.length > 2 ? _participants.length : 2;
-    final canDecrease = isOwner && players > minPlayers;
-    final canIncrease = isOwner && players < 15;
-    const segmentBg = Color(0xFF0E0E);
-    const centerBg = Color(0xFF080808);
-
-    return _buildUniformFieldContainer(
-      isTablet: isTablet,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: paddingH),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(Icons.people, color: Colors.white70, size: iconSz),
-            SizedBox(width: isTablet ? 12.0 : 8.w),
-            Expanded(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Material(
-                      color: segmentBg,
-                      child: InkWell(
-                        onTap: canDecrease
-                            ? () {
-                                setState(() {
-                                  players =
-                                      (players - 1).clamp(minPlayers, 15);
-                                  maxPlayers = players;
-                                  _updateSettings();
-                                });
-                              }
-                            : null,
-                        child: Center(
-                          child: Icon(
-                            Icons.remove,
-                            size: iconSz,
-                            color:
-                                canDecrease ? Colors.white : Colors.white30,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Container(
-                      color: centerBg,
-                      alignment: Alignment.center,
-                      child: Text(
-                        '$players',
-                        style: GoogleFonts.lato(
-                          color: Colors.white,
-                          fontSize: fontSize,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Material(
-                      color: segmentBg,
-                      child: InkWell(
-                        onTap: canIncrease
-                            ? () {
-                                setState(() {
-                                  players =
-                                      (players + 1).clamp(2, 15);
-                                  maxPlayers = players;
-                                  _updateSettings();
-                                });
-                              }
-                            : null,
-                        child: Center(
-                          child: Icon(
-                            Icons.add,
-                            size: iconSz,
-                            color:
-                                canIncrease ? Colors.white : Colors.white30,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildColorSelectorField(
-      {required bool isOwner, required bool isTablet}) {
-    final isTeamMode = selectedGameMode == 'team_vs_team';
-    final iconSz = isTablet ? 32.0 : 18.sp;
-    final boxSize = isTablet ? 28.0 : 22.r;
-    return _buildUniformFieldContainer(
-      isTablet: isTablet,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Flexible(
-            child: GestureDetector(
-              onTap: isTeamMode
-                  ? () {
-                      final nextTeam =
-                          (selectedTeam == 'orange') ? 'blue' : 'orange';
-                      _selectTeam(nextTeam, explicitlyUpdate: true);
-                    }
-                  : null,
-              child: Icon(
-                Icons.arrow_back_ios_new,
-                size: iconSz,
-                color: isTeamMode ? Colors.white : Colors.white30,
-              ),
-            ),
-          ),
-          SizedBox(width: 4.w),
-          Container(
-            width: boxSize,
-            height: boxSize,
-            decoration: BoxDecoration(
-              border: Border.all(
-                  width: 1.2,
-                  color: isTeamMode ? Colors.white : Colors.white30),
-              borderRadius: BorderRadius.circular(4.r),
-            ),
-            padding: EdgeInsets.all(2.w),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(2.r),
-                color: isTeamMode
-                    ? (selectedTeam == 'orange'
-                        ? Colors.orange
-                        : selectedTeam == 'blue'
-                            ? Colors.blue
-                            : Colors.grey.withOpacity(0.3))
-                    : Colors.grey.withOpacity(0.3),
-              ),
-            ),
-          ),
-          SizedBox(width: 4.w),
-          Flexible(
-            child: GestureDetector(
-              onTap: isTeamMode
-                  ? () {
-                      final nextTeam =
-                          (selectedTeam == 'blue') ? 'orange' : 'blue';
-                      _selectTeam(nextTeam, explicitlyUpdate: true);
-                    }
-                  : null,
-              child: Icon(
-                Icons.arrow_forward_ios,
-                size: iconSz,
-                color: isTeamMode ? Colors.white : Colors.white30,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Widget _buildCreateRoomTopStrip(bool isOwner) {
@@ -7174,260 +6610,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // Lobby filter pills matching multiplayer screen style (0xFF0E0E, white border, bottom sheet)
-  Widget _buildLobbyFilterPill({
-    required String hint,
-    required String? value,
-    required List<String> items,
-    required IconData icon,
-    Color iconColor = Colors.white70,
-    required bool isTablet,
-    required ValueChanged<String?>? onChanged,
-    required String Function(String) getDisplayValue,
-  }) {
-    final displayValue = value ?? hint;
-    return Container(
-      height: isTablet ? 65.0 : 45.h,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(25.r),
-        border: Border.all(
-            color: Colors.white, width: isTablet ? 2.0 : 1.w),
-        color: Colors.black.withOpacity(0.35),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(25.r),
-          onTap: onChanged == null
-              ? null
-              : () async {
-                  FocusScope.of(context).unfocus();
-                  final result = await showModalBottomSheet<String>(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (context) => SelectionBottomSheet(
-                      title: hint,
-                      items: items,
-                      selectedItem: value,
-                    ),
-                  );
-                  if (result != null) onChanged(result);
-                },
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 20.0 : 10.w,
-              vertical: isTablet ? 12.0 : 10.h,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Icon(icon,
-                    color: iconColor, size: isTablet ? 32.0 : 18.sp),
-                SizedBox(width: isTablet ? 12.0 : 8.w),
-                Expanded(
-                  child: Text(
-                    getDisplayValue(displayValue),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                    softWrap: false,
-                    textAlign: TextAlign.left,
-                    style: GoogleFonts.lato(
-                      color: Colors.white,
-                      fontSize: isTablet ? 22.0 : 13.sp,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-                SizedBox(width: isTablet ? 10.0 : 6.w),
-                Icon(Icons.keyboard_arrow_down_rounded,
-                    color: Colors.white70,
-                    size: isTablet ? 32.0 : 16.sp),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLobbyCategoryPill({
-    required String hint,
-    required List<String> selectedValues,
-    required List<String> items,
-    required IconData icon,
-    Color iconColor = Colors.orange,
-    required bool isTablet,
-    required ValueChanged<List<String>>? onChanged,
-    required String Function(String) getDisplayValue,
-  }) {
-    final displayText = selectedValues.isEmpty
-        ? hint
-        : selectedValues.length == 1
-            ? getDisplayValue(selectedValues.first)
-            : '${selectedValues.length} ${getDisplayValue('selected')}';
-    return Container(
-      height: isTablet ? 65.0 : 45.h,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(25.r),
-        border: Border.all(
-            color: Colors.white, width: isTablet ? 2.0 : 1.w),
-        color: Colors.black.withOpacity(0.35),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(25.r),
-          onTap: onChanged == null
-              ? null
-              : () async {
-                  FocusScope.of(context).unfocus();
-                  final result =
-                      await showModalBottomSheet<List<String>>(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (context) =>
-                        RoomCategoryPickerSheet(
-                      title: hint,
-                      items: items,
-                      selectedItems: selectedValues,
-                    ),
-                  );
-                  if (result != null) onChanged(result);
-                },
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 20.0 : 10.w,
-              vertical: isTablet ? 12.0 : 10.h,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Icon(icon,
-                    color: iconColor, size: isTablet ? 32.0 : 18.sp),
-                SizedBox(width: isTablet ? 12.0 : 8.w),
-                Expanded(
-                  child: Text(
-                    displayText,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                    softWrap: false,
-                    textAlign: TextAlign.left,
-                    style: GoogleFonts.lato(
-                      color: selectedValues.isEmpty
-                          ? Colors.white54
-                          : Colors.white,
-                      fontSize: isTablet ? 22.0 : 13.sp,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-                SizedBox(width: isTablet ? 10.0 : 6.w),
-                Icon(Icons.keyboard_arrow_down_rounded,
-                    color: Colors.white70,
-                    size: isTablet ? 32.0 : 16.sp),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLobbyGameModePill({
-    required bool isOwner,
-    required bool isTablet,
-  }) {
-    final displayValue = selectedGameMode == '1v1'
-        ? AppLocalizations.individual
-        : selectedGameMode == 'team_vs_team'
-            ? AppLocalizations.team
-            : AppLocalizations.individual;
-    return Container(
-      height: isTablet ? 65.0 : 45.h,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(25.r),
-        border: Border.all(
-            color: Colors.white, width: isTablet ? 2.0 : 1.w),
-        color: const Color(0xFF0E0E),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(25.r),
-          onTap: isOwner
-              ? () async {
-                  FocusScope.of(context).unfocus();
-                  final result = await showModalBottomSheet<String>(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (context) => SelectionBottomSheet(
-                      title: AppLocalizations.mode,
-                      items: [
-                        AppLocalizations.team,
-                        AppLocalizations.individual,
-                      ],
-                      selectedItem: displayValue,
-                    ),
-                  );
-                  if (result != null) {
-                    setState(() {
-                      selectedGameMode = result == AppLocalizations.team
-                          ? 'team_vs_team'
-                          : '1v1';
-                      selectedGamePlay =
-                          selectedGameMode == '1v1' ? '1 vs 1' : '2 vs 2';
-                    });
-                    _updateSettings();
-                  }
-                }
-              : null,
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: isTablet ? 20.0 : 10.w,
-              vertical: isTablet ? 12.0 : 10.h,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Icon(Icons.people,
-                    color: Colors.blueAccent,
-                    size: isTablet ? 32.0 : 18.sp),
-                SizedBox(width: isTablet ? 12.0 : 8.w),
-                Expanded(
-                  child: Text(
-                    displayValue,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                    softWrap: false,
-                    textAlign: TextAlign.left,
-                    style: GoogleFonts.lato(
-                      color: Colors.white,
-                      fontSize: isTablet ? 22.0 : 13.sp,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-                SizedBox(width: isTablet ? 10.0 : 6.w),
-                Icon(Icons.keyboard_arrow_down_rounded,
-                    color: Colors.white70,
-                    size: isTablet ? 32.0 : 16.sp),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -8318,7 +7500,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   Widget _buildToggleField({
-    double? width,
+    required double width,
     required String title,
     required bool value,
     required ValueChanged<bool> onChanged,
@@ -8326,9 +7508,12 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }) {
     final double iconSize = isTablet ? 32.sp : 20.sp; 
     final double fontSize = isTablet ? 18.sp : 14.sp;
-    final double height = isTablet ? 65.0 : 45.h;
+    final double height = isTablet ? 60.h : 45.h;
 
-    final child = _gradientShell(
+    return SizedBox(
+      width: width,
+      height: height,
+      child: _gradientShell(
         isActive: value,
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 2.h),
@@ -8363,11 +7548,8 @@ class _GameRoomScreenState extends State<GameRoomScreen>
             ],
           ),
         ),
+      ),
     );
-    if (width != null) {
-      return SizedBox(width: width, height: height, child: child);
-    }
-    return SizedBox(height: height, child: child);
   }
 
   Widget _gradientShell({required Widget child, required bool isActive}) {
@@ -9177,7 +8359,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   void _showThicknessOpacityPopup(TapDownDetails details) async {
-    if (!_amIDrawer) return;
+    if (!_isDrawer) return;
 
     final Offset position = details.globalPosition;
     const Color containerBackground =
@@ -9698,10 +8880,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     _wordSelectionTimer = null;
     _teamScoreboardTimer?.cancel();
     _teamScoreboardTimer = null;
-    _phaseCountdownTimer?.cancel();
-    _phaseCountdownTimer = null;
-    _progressSmoothTimer?.cancel();
-    _stopProgressSmoothTimer();
     _speakingCleanupTimer?.cancel();
     _speakingCleanupTimer = null;
     for (final timer in _retryTimers.values) {
@@ -9786,36 +8964,38 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     
   }
 
-  /// Remaining seconds until phase end.
+  /// Remaining seconds from room.
   ///
-  /// Prefer [roundPhaseEndTime] so the client derives remaining from "end time minus now",
-  /// staying in sync even when the message is delayed. Fall back to [roundRemainingTime]
-  /// only when [roundPhaseEndTime] is not available.
+  /// IMPORTANT: Prefer the backend-computed `roundRemainingTime` so the client
+  /// does not re-derive time using its own clock (which can drift from the
+  /// server and cause off-by-one / early-zero issues). Only fall back to
+  /// `roundPhaseEndTime` when `roundRemainingTime` is not available.
   int? _remainingSecondsFromRoom(RoomModel? room) {
     if (room == null) return null;
-    // 1. Prefer end time: derive remaining from "now" so we stay in sync despite message delay.
+    // 1. Trust backend's precomputed remaining time when present.
+    if (room.roundRemainingTime != null) {
+      return room.roundRemainingTime;
+    }
+    // 2. Fallback: derive from end time if needed.
     if (room.roundPhaseEndTime != null) {
       final ms = room.roundPhaseEndTime!.millisecondsSinceEpoch -
           DateTime.now().millisecondsSinceEpoch;
       return math.max(0, (ms / 1000).ceil());
     }
-    // 2. Fallback: use backend's precomputed remaining when end time is not available.
-    if (room.roundRemainingTime != null) {
-      return room.roundRemainingTime;
-    }
     return null;
   }
 
-  /// Remaining seconds from room map (raw JSON). Prefer [roundPhaseEndTime], fallback to [roundRemainingTime].
   int? _remainingSecondsFromRoomMap(Map<String, dynamic>? room) {
     if (room == null) return null;
-    // 1. Prefer end time: derive remaining from "now" so we stay in sync despite message delay.
+    // 1. Prefer backend-computed remaining time.
+    final r = room['roundRemainingTime'];
+    if (r != null) {
+      return r is int ? r : (r as num).round();
+    }
+
+    // 2. Fallback: derive from end time if needed.
     final endTime = room['roundPhaseEndTime'];
     if (endTime != null) {
-      if (endTime is int || endTime is num) {
-        final ms = (endTime as num).toInt() - DateTime.now().millisecondsSinceEpoch;
-        return math.max(0, (ms / 1000).ceil());
-      }
       final DateTime? end = endTime is String
           ? DateTime.tryParse(endTime as String)
           : (endTime is DateTime ? endTime : null);
@@ -9825,33 +9005,11 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         return math.max(0, (ms / 1000).ceil());
       }
     }
-    // 2. Fallback: use backend's precomputed remaining when end time is not available.
-    final r = room['roundRemainingTime'];
-    if (r != null) {
-      return r is int ? r : (r as num).round();
-    }
     return null;
   }
 
-  /// Clears local canvas state (session-scoped invalidation). Use when resuming as guesser or when round changed.
-  void _clearCanvasState() {
-    _strokes.value = [];
-    _currentStroke.clear();
-    try {
-      _undoRedoStack.clear();
-    } catch (_) {}
-    _lastSequenceFromSnapshot = -1;
-  }
-
-  /// Whether to clear canvas after syncing room state (guesser or round changed).
-  bool _shouldClearCanvasAfterSync(RoomModel room, bool isDrawer) {
-    final oldRound = _room?.currentRound;
-    return !isDrawer ||
-        (room.currentRound != null && room.currentRound != oldRound);
-  }
-
   /// Sync with an already-playing game (e.g. after re-join or refetch when host started while we were in ad).
-  /// Uses room.roundPhaseEndTime for remaining so we stay in sync; requests canvas data.
+  /// Requests canvas data and sets phase/remaining time from room so UI matches server.
   void _syncWithPlayingRoom() {
     if (!mounted || _room?.status != 'playing' || _room?.code == null) return;
     setState(() {
@@ -9860,30 +9018,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       final rem = _remainingSecondsFromRoom(_room);
       if (rem != null) _phaseTimeRemaining = rem;
     });
-    // Start local phase countdown from room.roundPhaseEndTime so timer stays in sync.
-    if (_room?.roundPhaseEndTime != null && mounted) {
-      _phaseCountdownTimer?.cancel();
-      _phaseCountdownTimer = null;
-      final endMs = _room!.roundPhaseEndTime!.millisecondsSinceEpoch;
-      _phaseCountdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-        if (!mounted) return;
-        final now = DateTime.now().millisecondsSinceEpoch;
-        final rem = ((endMs - now) / 1000).ceil().clamp(0, _phaseMaxTime);
-        setState(() {
-          _phaseTimeRemaining = rem;
-        });
-        if (rem <= 0) {
-          _phaseCountdownTimer?.cancel();
-          _phaseCountdownTimer = null;
-          _stopProgressSmoothTimer();
-        }
-      });
-      _startProgressSmoothTimer(endMs);
-    }
-    if (_phaseMaxTime > 0 && _room?.roundPhaseEndTime == null) {
-      final progress = (_phaseTimeRemaining / _phaseMaxTime).clamp(0.0, 1.0);
-      _updateProgressAnimation(progress, immediate: true);
-    }
     _socketService.socket?.emit('request_canvas_data', {'roomCode': _room!.code});
   }
 
@@ -9936,12 +9070,42 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         _isLeaderboardVisible = !_isLeaderboardVisible;
       });
     }
-    NativeLogService.log(
+    developer.log(
       'Toggling leaderboard visibility. Current state: $_isLeaderboardVisible',
-      tag: _logTag,
-      level: 'debug'
+      name: _logTag,
     );
   }
+
+  // // #region agent log
+  // Future<void> _agentDebugLog(
+  //   String location,
+  //   String message,
+  //   Map<String, dynamic> data,
+  //   String hypothesisId,
+  //   String runId,
+  // ) async {
+  //   try {
+  //     final file = File(
+  //       'c:/Users/RAJU/Desktop/InkBattle/inkbattle_github/.cursor/debug.log',
+  //     );
+  //     await file.writeAsString(
+  //       '${jsonEncode({
+  //         'id':
+  //             'log_\${DateTime.now().millisecondsSinceEpoch}_\${location.replaceAll(':', '_')}',
+  //         'timestamp': DateTime.now().millisecondsSinceEpoch,
+  //         'location': location,
+  //         'message': message,
+  //         'data': data,
+  //         'runId': runId,
+  //         'hypothesisId': hypothesisId,
+  //       })}\n',
+  //       mode: FileMode.append,
+  //     );
+  //   } catch (_) {
+  //     // Swallow logging errors to avoid impacting gameplay.
+  //   }
+  // }
+  // // #endregion
 
   _DrawerMessageOption? _findDrawerMessageOption(String? key) {
     if (key == null) return null;
@@ -11411,7 +10575,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   // Inside _GameRoomScreenState...
 
   void _showPencilToolsPopup(TapDownDetails details) async {
-    if (!_amIDrawer) return;
+    if (!_isDrawer) return;
 
     final Offset position = details.globalPosition;
 
@@ -11970,10 +11134,9 @@ class _GameRoomScreenState extends State<GameRoomScreen>
   }
 
   List<Widget> _buildModalOverlays() {
-    NativeLogService.log(
+    developer.log(
       "CURRENT PHASE : $_currentPhase",
-      tag: _logTag,
-      level: 'debug'
+      name: _logTag,
     );
     // 1. HIGHEST PRIORITY: Word Selection Dialog (Blocks all others)
     if (_isWordSelectionDialogVisible) {
@@ -12042,8 +11205,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         ? remainingSeconds / _phaseMaxTime
         : 0.0;
     
-    // Only show red when we have valid remaining time in (0, 20); avoid red when remaining is 0 (sync/network delay)
-    final bool isCritical = isDrawingPhase && remainingSeconds > 0 && remainingSeconds < 20;
+    final bool isCritical = isDrawingPhase && remainingSeconds < 20;
 
     // NEW CODE BLOCK (REPLACEMENT)
     Color indicatorColor;
@@ -12069,18 +11231,41 @@ class _GameRoomScreenState extends State<GameRoomScreen>
       indicatorColor = Colors.transparent;
     }
 
-    NativeLogService.log(
-      'boardAreaTiming [H1/run1] phase: $_currentPhase, phaseMaxTime: $_phaseMaxTime, phaseTimeRemaining: $_phaseTimeRemaining, remainingSeconds: $remainingSeconds, progress: $progress, indicatorColor: ${indicatorColor.value}, isDrawingPhase: $isDrawingPhase',
-      tag: 'game_room_screen.dart:_buildBoardArea',
-      level: 'debug',
-    );
-
-    // Update progress from build only when smooth timer is not running
-    if (_phaseEndTimeMs == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _updateProgressAnimation(progress);
-      });
-    }
+    // // #region agent log
+    // developer.log(
+    //   'boardAreaTiming [H1/run1]',
+    //   name: 'game_room_screen.dart:_buildBoardArea',
+    //   error: const JsonEncoder.withIndent('  ').convert({
+    //     'phase': _currentPhase,
+    //     'phaseMaxTime': _phaseMaxTime,
+    //     'phaseTimeRemaining': _phaseTimeRemaining,
+    //     'remainingSeconds': remainingSeconds,
+    //     'progress': progress,
+    //     'indicatorColor': indicatorColor.value,
+    //     'isDrawingPhase': isDrawingPhase,
+    //   }),
+    // );
+    // // #endregion
+    // #region agent log
+    print('--- AGENT LOG: boardAreaTiming [H1/run1] ---');
+    print('Source: game_room_screen.dart:_buildBoardArea');
+    print(const JsonEncoder.withIndent('  ').convert({
+      'phase': _currentPhase,
+      'phaseMaxTime': _phaseMaxTime,
+      'phaseTimeRemaining': _phaseTimeRemaining,
+      'remainingSeconds': remainingSeconds,
+      'progress': progress,
+      'indicatorColor': indicatorColor.value,
+      'isDrawingPhase': isDrawingPhase,
+    }));
+    print('-------------------------------------------');
+    // #endregion
+    // Update animation smoothly when progress changes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _updateProgressAnimation(progress);
+      }
+    });
 
     final Widget boardContent = ClipRRect(
       borderRadius: BorderRadius.circular(10.r),
@@ -12158,7 +11343,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                       ),
                     ),
                   ),
-                if (_amIDrawer &&
+                if (_isDrawer &&
                     !_waitingForPlayers &&
                     _room?.status == 'playing')
                   Positioned(
@@ -12175,7 +11360,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     right: 0,
                     child: Center(child: _buildHintSystem()),
                   ),
-                if (_amIDrawer &&
+                if (_isDrawer &&
                     !_waitingForPlayers &&
                     _room?.status == 'playing' &&
                     _currentPhase == 'drawing')
@@ -12195,22 +11380,25 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         borderRadius: BorderRadius.circular(10.r),
         border: universalBorder,
       ),
-      child: ListenableBuilder(
-        listenable: _progressValue,
+      child: AnimatedBuilder(
+        animation: _progressAnimation,
         builder: (context, child) {
-          final p = _progressValue.value.clamp(0.0, 1.0);
+          
+          
           return CustomPaint(
-            foregroundPainter: p > 0 && indicatorColor != Colors.transparent
+            foregroundPainter: _progressAnimation.value > 0 &&
+                    indicatorColor != Colors.transparent
                 ? _PhaseBorderPainter(
-                    progress: p,
+                    progress: _progressAnimation.value.clamp(0.0, 1.0),
                     color: indicatorColor,
                     strokeWidth: 4.w,
                     borderRadius: 10.r,
                   )
                 : null,
-            child: boardContent,
+            child: child,
           );
         },
+        child: boardContent,
       ),
     );
   }
@@ -12292,7 +11480,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
     final bool isDrawingPhase = !_waitingForPlayers &&
         _room?.status == 'playing' &&
         _currentPhase == 'drawing';
-    final bool isFullScreenDrawer = _amIDrawer && isDrawingPhase;
+    final bool isFullScreenDrawer = _isDrawer && isDrawingPhase;
     final bool isActive = _hintsRemaining > 0 &&
         _currentWord != null &&
         _currentPhase == 'drawing';
@@ -12408,7 +11596,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     margin: const EdgeInsets.fromLTRB(5, 10, 5, 10),
                     decoration: BoxDecoration(
                       border: Border.all(
-                        color: _amIDrawer ? Colors.white : Colors.grey,
+                        color: _isDrawer ? Colors.white : Colors.grey,
                         width: 2,
                       ),
                       borderRadius: const BorderRadius.all(Radius.circular(3)),
@@ -12427,7 +11615,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     margin: const EdgeInsets.fromLTRB(5, 10, 5, 10),
                     decoration: BoxDecoration(
                       border: Border.all(
-                          color: _amIDrawer ? Colors.white : Colors.grey,
+                          color: _isDrawer ? Colors.white : Colors.grey,
                           width: 2),
                       borderRadius: const BorderRadius.all(Radius.circular(3)),
                     ),
@@ -12486,7 +11674,6 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                                     children: [
                                       ElevatedButton(
                                         onPressed: () {
-                                          if (_connectionState != GameConnectionState.ready) return;
                                           Navigator.pop(context);
                                           setState(() {
                                             _currentWord = null;
@@ -12560,7 +11747,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     margin: const EdgeInsets.fromLTRB(5, 10, 5, 10),
                     decoration: BoxDecoration(
                       border: Border.all(
-                          color: _amIDrawer ? Colors.white : Colors.grey,
+                          color: _isDrawer ? Colors.white : Colors.grey,
                           width: 2),
                       borderRadius: const BorderRadius.all(Radius.circular(3)),
                     ),
@@ -12581,7 +11768,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                       margin: const EdgeInsets.fromLTRB(5, 10, 5, 10),
                       decoration: BoxDecoration(
                         border: Border.all(
-                            color: _amIDrawer ? Colors.white : Colors.grey,
+                            color: _isDrawer ? Colors.white : Colors.grey,
                             width: 2),
                         borderRadius:
                             const BorderRadius.all(Radius.circular(3)),
@@ -12603,7 +11790,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
                     margin: const EdgeInsets.fromLTRB(5, 10, 5, 10),
                     decoration: BoxDecoration(
                       border: Border.all(
-                          color: _amIDrawer ? Colors.white : Colors.grey,
+                          color: _isDrawer ? Colors.white : Colors.grey,
                           width: 2),
                       borderRadius: const BorderRadius.all(Radius.circular(3)),
                     ),
@@ -13215,7 +12402,7 @@ class _GameRoomScreenState extends State<GameRoomScreen>
         _findDrawerMessageOption(_currentDrawerMessageKey);
 
     final bool canSelectMessage =
-        _amIDrawer && !_waitingForPlayers && (_room?.status == 'playing');
+        _isDrawer && !_waitingForPlayers && (_room?.status == 'playing');
 
     final Color borderColor =
         selectedOption?.accentColor.withOpacity(0.6) ?? const Color(0xFF0B0B0B);
@@ -14927,7 +14114,7 @@ Widget teamBadge({
   required VoidCallback onTap,
   bool isTablet = false,
 }) {
-  NativeLogService.log("ISTABLET: $isTablet", tag: _teamBadgeLogTag, level: 'debug');
+  developer.log("ISTABLET: $isTablet", name: _teamBadgeLogTag);
   final Widget circle = Container(
     width: isTablet ? 25.w : 32.w,
     height: isTablet ? 32.h : 35.h,

@@ -276,7 +276,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           height: height,
           child: InkWell(
             borderRadius: BorderRadius.circular(14),
-            onTap: onPressed,
+            onTap: soundControl ? null : onPressed,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               decoration: BoxDecoration(
@@ -327,12 +327,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: BlocBuilder<SettingsBloc, SettingsState>(
                         builder: (_, state) {
                           return Slider(
-                            value: state.soundValue,
+                            value: state.soundValue.clamp(0.0, 1.0),
                             onChanged: (v) {
                               context
                                   .read<SettingsBloc>()
-                                  .add(UpdateSoundValue(v));
+                                  .add(UpdateSoundValue(v.clamp(0.0, 1.0)));
                             },
+                            min: 0.0,
+                            max: 1.0,
                             activeColor: Colors.white,
                             inactiveColor: Colors.white30,
                           );

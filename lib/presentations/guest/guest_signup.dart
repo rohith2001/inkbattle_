@@ -4,7 +4,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:inkbattle_frontend/constants/app_colors.dart';
 import 'package:inkbattle_frontend/constants/app_images.dart';
 import 'package:inkbattle_frontend/widgets/backgroun_scafold.dart';
-import 'package:inkbattle_frontend/widgets/custom_svg.dart';
 import 'package:inkbattle_frontend/widgets/text_widget.dart';
 import 'package:inkbattle_frontend/widgets/textformfield_widget.dart';
 import 'package:go_router/go_router.dart';
@@ -532,10 +531,10 @@ final List<String> languages = [
                                   hintText: AppLocalizations.enterUsername,
                                   prefixIcon: Padding(
                                     padding: EdgeInsets.all(10.w),
-                                    child: CustomSvgImage(
-                                      imageUrl: AppImages.userSvg,
-                                      height: isTablet ? 24.h : 21.h,
-                                      width: isTablet ? 24.w : 21.w,
+                                    child: Icon(
+                                      Icons.person_outline,
+                                      color: const Color.fromRGBO(255, 255, 255, 0.52),
+                                      size: isTablet ? 24.sp : 21.sp,
                                     ),
                                   ),
                                 ),
@@ -567,10 +566,10 @@ final List<String> languages = [
                                   isTablet: isTablet,
                                   prefixIcon: Padding(
                                     padding: EdgeInsets.all(12.w),
-                                    child: CustomSvgImage(
-                                      imageUrl: AppImages.languageSvg,
-                                      height: isTablet ? 24.h : 21.h,
-                                      width: isTablet ? 24.w : 21.w,
+                                    child: Icon(
+                                      Icons.language,
+                                      color: const Color.fromRGBO(255, 255, 255, 0.52),
+                                      size: isTablet ? 24.sp : 21.sp,
                                     ),
                                   ),
                                   onChanged: (val) => _changeLanguage(val),
@@ -625,7 +624,8 @@ final List<String> languages = [
                                     if (mounted) setState(() {});
                                   },
                                   hintText: AppLocalizations.country,
-                                  imageUrl: AppImages.coutrySvg,
+                                  icon: Icons.public,
+                                  iconColor: const Color.fromRGBO(255, 255, 255, 0.52),
                                   isTablet: isTablet,
                                   useGradientDesign: true,
                                 ),
@@ -1035,10 +1035,10 @@ final List<String> languages = [
                 if (!isFilled)
                   Padding(
                     padding: EdgeInsets.all(12.w),
-                    child: CustomSvgImage(
-                      imageUrl: AppImages.coutrySvg,
-                      height: 24.h,
-                      width: 24.w,
+                    child: Icon(
+                      Icons.public,
+                      color: const Color.fromRGBO(255, 255, 255, 0.52),
+                      size: 24.sp,
                     ),
                   ),
                 if (!isFilled) SizedBox(width: 8.w),
