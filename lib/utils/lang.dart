@@ -267,7 +267,10 @@ class AppLocalizations {
           'No public rooms match your preferences. Try different settings or create a new room.',
       'try_again': 'Try Again',
 
-      'selected': 'selected',   
+      'selected': 'selected',
+      'done': 'Done',
+      'select_all': 'Select All',
+      'deselect_all': 'Deselect All',
       'team_a_is_full': 'Team A is full',
       'team_b_is_full': 'Team B is full',
       'please_select_the_other_team': 'Please select the other team.',
@@ -4344,6 +4347,9 @@ class AppLocalizations {
   static String get selectAllFiltersToViewRooms => translate('select_all_filters_to_view_rooms');
   static String get oneCategorySelected => translate('one_category_selected');
   static String get categoriesSelected => translate('categories_selected');
+  static String get done => translate('done');
+  static String get selectAll => translate('select_all');
+  static String get deselectAll => translate('deselect_all');
   static String get noMatchesFound => translate('no_matches_found');
   static String get noMatchesMessage => translate('no_matches_message');
   static String get tryAgain => translate('try_again');
