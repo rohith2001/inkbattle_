@@ -24,12 +24,23 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Load .env file if it exists, otherwise use default values from Environment class
+  // try {
+  //   await dotenv.load(fileName: ".env");
+  // } catch (e) {
+  //   // .env file not found, will use default values from Environment class
+  //   print("Warning: .env file not found, using default values");
+  // }
+
+  // 1. Detect which environment file to load (Defaults to staging)
+  const String envFile = String.fromEnvironment('ENV_FILE', defaultValue: '.env.staging');
+
   try {
-    await dotenv.load(fileName: ".env");
+    await dotenv.load(fileName: envFile);
+    print("Successfully loaded $envFile");
   } catch (e) {
-    // .env file not found, will use default values from Environment class
-    print("Warning: .env file not found, using default values");
+    print("Warning: $envFile not found, using Environment class defaults");
   }
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
