@@ -1,41 +1,18 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class Environment {
-  // For Android Emulator with adb reverse, use localhost
-  // Run: adb reverse tcp:4000 tcp:4000
-  // For iOS Simulator, also use localhost
-  static const String apiBaseUrl = "https://inkbattle.in/api";
-  static const String socketUrl = "https://inkbattle.in";
+  // API and Socket URLs: read from .env with production fallbacks.
+  // For local dev: copy .env.example to .env and set API_BASE_URL and SOCKET_URL to your local backend (e.g. http://localhost:4000/api, http://localhost:4000).
+  // For physical device on same network: use your machine IP (e.g. http://192.168.x.x:4000/api).
+  static String get apiBaseUrl =>
+      dotenv.env['API_BASE_URL'] ?? 'https://inkbattle.in/api';
+  static String get socketUrl =>
+      dotenv.env['SOCKET_URL'] ?? 'https://inkbattle.in';
+
   static const String appSecret = "InkBattle_Secure_2024"; // match Nginx exactly
   static const int dailyCoinsAwarded = 1000;
 
-  // static const String apiBaseUrl =
-  //     "http://ec2-35-154-241-0.ap-south-1.compute.amazonaws.com:4000/api";
-  // static const String socketUrl =
-  //     "http://ec2-35-154-241-0.ap-south-1.compute.amazonaws.com:4000";
-
-
-// static const String apiBaseUrl = "http://192.168.1.6:4000/api";
-// static const String socketUrl = "http://192.168.1.6:4000";
-
-  // static const String apiBaseUrl =
-  //     "https://inkbattle-a-backend.onrender.com/api";
-  // static const String socketUrl = "https://inkbattle-a-backend.onrender.com";
-//  static const String apiBaseUrl = "http://192.168.1.6:4000/api";
-  //static const String socketUrl = "http://192.168.1.6:4000";
-  // static const String apiBaseUrl =
-  //     "https://inkbattle-a-backend.onrender.com/api";
-  // static const String socketUrl = "https://inkbattle-a-backend.onrender.com";
-
-  // For physical device on same network, use your computer's IP:
-  // static const String apiBaseUrl = "http://192.168.x.x:4000/api";
-  // static const String socketUrl = "http://192.168.x.x:4000";
-
-  // For production:
-  // static const String apiBaseUrl = "https://your-production-api.com/api";
-  // static const String socketUrl = "https://your-production-api.com";
-
-  // Razorpay Configuration (from .env)
+  // Razorpay Configuration (from .env) - uncomment when needed
   // static String get razorpayKeyId =>
   //     dotenv.env['RAZORPAY_KEY_ID'] ?? 'rzp_test_RaT4OZ1pgy4cJb';
   // static String get razorpayKeySecret =>
@@ -47,7 +24,7 @@ class Environment {
   static String get agoraAppId =>
       dotenv.env['AGORA_APP_ID'] ?? '85ed3bccf4dc4f62b3e30b834a0b5670';
 
-  // /// Web client ID (OAuth 2.0) from Firebase/Google Cloud. Required for Google Sign-In idToken on Android.
+  // Web client ID (OAuth 2.0) from Firebase/Google Cloud. Required for Google Sign-In idToken on Android.
   // static String get googleWebClientId =>
   //     dotenv.env['GOOGLE_WEB_CLIENT_ID'] ??
   //     '810403540241-ip9gtcb25f8m6f3du23riuqj5h5dbr9l.apps.googleusercontent.com';

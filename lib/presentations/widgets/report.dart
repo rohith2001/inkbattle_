@@ -7,7 +7,6 @@ import 'package:inkbattle_frontend/presentations/widgets/form.dart';
 import 'package:inkbattle_frontend/presentations/widgets/submitted.dart';
 import 'package:inkbattle_frontend/repositories/user_repository.dart';
 import 'package:inkbattle_frontend/services/native_log_service.dart';
-import 'dart:developer' as developer;
 
 class ErrorPopup extends StatelessWidget {
   ErrorPopup({

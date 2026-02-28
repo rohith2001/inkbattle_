@@ -12,23 +12,60 @@ class SocketService {
 
   IO.Socket? _socket;
   bool _isConnected = false;
+  String? _lastToken;
+
+  /// Called when the same socket instance reconnects (e.g. after app resume or server restart).
+  /// Use for re-joining room; do NOT create a new socket here.
+  void Function()? _onReconnect;
+
+  /// Called when socket disconnects. Use to set connection state to syncing so game actions are blocked until room_joined.
+  void Function()? _onDisconnect;
 
   bool get isConnected => _isConnected;
   IO.Socket? get socket => _socket;
 
-  void connect(String token) {
-    if (_socket != null && _isConnected) {
-      _socket?.disconnect();
+  /// Register callback to run when socket reconnects (same instance, new connection).
+  /// Call once from game screen so we re-join room and sync phase.
+  void setOnReconnect(void Function() callback) {
+    _onReconnect = callback;
+  }
+
+  /// Register callback to run when socket disconnects. Use to set syncing state so user actions are blocked until room_joined.
+  void setOnDisconnect(void Function() callback) {
+    _onDisconnect = callback;
+  }
+
+  /// Connect with token. Uses ONE socket instance; only creates new socket when none exists or token changed (e.g. logout/login).
+  /// App resume: do NOT call connect() again — same socket auto-reconnects and listeners stay attached.
+  /// Returns true if a new socket was created (caller should register listeners once); false if reusing existing socket.
+  bool connect(String token) {
+    // Same token and socket exists: do nothing (socket may be disconnected; auto-reconnect will handle).
+    if (_socket != null && _lastToken == token) {
+      log('Socket already exists for same token; not replacing (reconnect the connection, not the socket)');
+      return false;
     }
+
+    // Token changed or explicit new session: dispose old socket.
+    if (_socket != null) {
+      _socket?.disconnect();
+      _socket?.dispose();
+      _socket = null;
+      _isConnected = false;
+      _lastToken = null;
+      log('Socket disposed (token change or reset)');
+    }
+
     print("Sending token: $token");
+    _lastToken = token;
     _socket = IO.io(
       Environment.socketUrl,
       IO.OptionBuilder()
           .setTransports(['websocket'])
           .enableAutoConnect()
+          .enableReconnection()
+          .disableForceNew()
           .setAuth({'token': token})
           .setExtraHeaders({'X-App-Secret': Environment.appSecret})
-          .enableForceNew()
           .build(),
     );
 
@@ -40,6 +77,21 @@ class SocketService {
     _socket?.onDisconnect((_) {
       _isConnected = false;
       log('Socket disconnected');
+      _onDisconnect?.call();
+    });
+
+    _socket?.on('reconnect_attempt', (_) {
+      log('Socket reconnect attempt');
+    });
+
+    _socket?.on('reconnect', (_) {
+      _isConnected = true;
+      log('Socket reconnected (same instance): ${_socket?.id}');
+      _onReconnect?.call();
+    });
+
+    _socket?.on('reconnect_failed', (_) {
+      log('Socket reconnect failed (all attempts exhausted)');
     });
 
     _socket?.onError((error) {
@@ -49,6 +101,7 @@ class SocketService {
     _socket?.onConnectError((error) {
       log('Socket connection error: $error');
     });
+    return true;
   }
 
   void disconnect() {
@@ -56,6 +109,9 @@ class SocketService {
     _socket?.dispose();
     _socket = null;
     _isConnected = false;
+    _lastToken = null;
+    _onReconnect = null;
+    _onDisconnect = null;
     log('Socket disconnected and disposed');
   }
 
@@ -153,6 +209,10 @@ class SocketService {
   }
 
   // Listeners
+  void onServerSyncing(void Function() callback) {
+    _socket?.on('server_syncing', (_) => callback());
+  }
+
   void onRoomJoined(Function(dynamic) callback) {
     _socket?.on('room_joined', callback);
   }
@@ -345,13 +405,22 @@ class SocketService {
   }
 
   void sendCanvasData(String roomCode, String targetSocketId,
-      List<Map<String, dynamic>> history, double remainingTime) {
-    _socket?.emit('send_canvas_data', {
+      List<Map<String, dynamic>> history, double remainingTime,
+      {int lastSequence = 0, Object? targetUserId}) {
+    final payload = <String, dynamic>{
       'roomCode': roomCode,
       'targetSocketId': targetSocketId,
       'history': history,
-      'remainingTime': remainingTime
-    });
+      'remainingTime': remainingTime,
+      'lastSequence': lastSequence,
+    };
+    if (targetUserId != null) payload['targetUserId'] = targetUserId;
+    _socket?.emit('send_canvas_data', payload);
+  }
+
+  /// Call after applying canvas_resume snapshot so server stops skipping drawing_data for this socket.
+  void emitResyncDone() {
+    _socket?.emit('resync_done');
   }
 
   void skipTurn(String roomid) {
@@ -367,8 +436,9 @@ class SocketService {
     _socket?.emit('choose_word', {'roomId': roomId, 'word': word});
   }
 
-  // Remove listeners
+  // Remove listeners (e.g. when leaving game screen). Also clear reconnect callback so we don't hold widget reference.
   void removeAllListeners() {
+    _onReconnect = null;
     _socket?.off('room_joined');
     _socket?.off('room_participants');
     _socket?.off('player_joined');
@@ -397,5 +467,6 @@ class SocketService {
     _socket?.off('game_ended_insufficient_players');
     _socket?.off('exited_due_to_inactivity');
     _socket?.off('server:restarting');
+    _socket?.off('server_syncing');
   }
 }
